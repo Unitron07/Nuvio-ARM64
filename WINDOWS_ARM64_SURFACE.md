@@ -4,6 +4,59 @@ Status: initial implementation for review, **not a working ARM64 installer yet**
 Baseline: [NuvioMedia/NuvioDesktop Dev](https://github.com/NuvioMedia/NuvioDesktop/tree/5e18596aa919a6a4e7b6cdee7f90dfaabbf71b00), commit `5e18596aa919a6a4e7b6cdee7f90dfaabbf71b00`.
 Inspection: October 24–25, 2026.
 
+## Stage 2: QuickJS JNI source build
+
+Stage 2 starts at merged `main` commit
+`f14296e7e2f38cef5acedc1831d927f0161029b0` (PR #1). The only other branch,
+`arm64-surface-foundation`, is merged. Upstream `Dev` remains the recorded
+`5e18596aa919a6a4e7b6cdee7f90dfaabbf71b00` baseline. Existing PE/touch work is
+retained. Latest foundation PE and PR-template Actions runs passed; an older
+PR-template failure was corrected before merging.
+
+The new `scripts/windows/build-quickjs.ps1` builds the **QuickJS-KT JNI bridge**,
+not just the QuickJS C API. It pins QuickJS-KT 1.0.15 to
+`a081755bcdb18ee6afa7ffee25b8fa976f06d31f`, Bellard QuickJS to
+`04be246001599f5995fa2f2d8c91a0f198d3f34c`, and c-vector to
+`774773d4cb1e66dd736e90e7f482d4f22af464c6`. Dirty source trees are rejected.
+The isolated CMake configuration includes the unchanged JNI and mapping sources.
+Bellard's GNU C extensions require Clang; use **clang-cl targeting the MSVC ABI**,
+MSVC ARM64 libraries and Windows SDK rather than claiming plain `cl` support.
+The private Win32 compatibility layer covers only the mutex, condition variable
+and realtime clock functions used by these pinned sources. It preserves recursive
+JNI locking and QuickJS Atomics; it is not a general pthread implementation.
+The static C runtime avoids a separate winpthreads DLL and permits QuickJS-KT's
+single-resource extraction/loading behavior. Notices, source pins, toolchain
+versions, DLL SHA256 and JNI export listing accompany the output.
+
+Prerequisites: Windows JDK 21, Visual Studio C++ tools for the target architecture,
+Windows SDK, LLVM clang-cl, CMake, Ninja, Git and network access. With an ARM64
+JDK in `JAVA_HOME`, from a fresh checkout on Surface Pro 11:
+
+```powershell
+./scripts/windows/build-quickjs.ps1 -Architecture arm64
+./gradlew.bat -p scripts/windows/quickjs-smoke run `
+  "-PquickjsDll=$pwd/build/windows-quickjs/arm64/libquickjs.dll" `
+  -PexpectedArch=aarch64 --no-daemon --console=plain
+```
+
+This tests the published Kotlin artifact and actual `jni/windows_aarch64`
+resource loader with `-Xcheck:jni`, including initialization, evaluation, Unicode
+and embedded NUL, exceptions/recovery, synchronous callbacks, suspending callbacks,
+promise jobs, Atomics and repeated disposal. A separate workflow runs ARM64 on
+`windows-11-arm` and x64 regression on `windows-2022`; artifacts are JNI runtime
+bundles, **not application images**. The original x64 release workflow is untouched.
+Successful source compilation alone does not establish JNI ABI compatibility.
+
+For application staging after this test passes, pass
+`-Pnuvio.windows.quickjs.dll=<checkout>/build/windows-quickjs/arm64/libquickjs.dll`
+to the existing app tasks, together with the libmpv and WebView2 properties below.
+
+At initial implementation time the local host has an ARM64 JDK but no installed
+MSVC/Windows SDK/LLVM C++ toolchain. Native CI execution and local DLL smoke results
+are recorded below when available. libmpv's complete ARM64 runtime, the player
+bridge, full application startup and HTTP/debrid playback remain separate gates.
+No MSI or release is produced by this milestone.
+
 ## Scope
 
 The requested ARM64 target uses a debrid service and HTTP media streams. Native
