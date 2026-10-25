@@ -33,3 +33,11 @@ target_compile_options(quickjs PRIVATE /clang:-std=gnu11 /U__SIZEOF_INT128__ /FI
 # JNIEXPORT supplies the public JNI symbols. Do not use the upstream .def,
 # which exports the generic C API for Kotlin/Native rather than the JNI ABI.
 target_link_options(quickjs PRIVATE /INCREMENTAL:NO /Brepro)
+
+enable_testing()
+add_executable(win32-compat-test win32-compat-test.c win32-compat.c)
+target_include_directories(win32-compat-test PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}/include")
+target_compile_definitions(win32-compat-test PRIVATE WIN32_LEAN_AND_MEAN NOMINMAX)
+set_target_properties(win32-compat-test PROPERTIES MSVC_RUNTIME_LIBRARY "MultiThreaded")
+add_test(NAME win32-synchronization COMMAND win32-compat-test)
+set_tests_properties(win32-synchronization PROPERTIES TIMEOUT 15)

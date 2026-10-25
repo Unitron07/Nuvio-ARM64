@@ -58,6 +58,9 @@ Invoke-Checked $CMake @('-S', "$PSScriptRoot/quickjs", '-B', $build, '-G', 'Ninj
     "-DQUICKJS_KT_SOURCE=$source", "-DCMAKE_C_COMPILER=$ClangCl", "-DCMAKE_C_COMPILER_TARGET=$target",
     '-DCMAKE_BUILD_TYPE=Release')
 Invoke-Checked $CMake @('--build', $build, '--parallel', '2')
+# This executable must run natively on a matching host. Cross builds are not
+# accepted as smoke-tested by this script.
+Invoke-Checked ctest @('--test-dir', $build, '--output-on-failure')
 $output = Join-Path $BuildRoot $Architecture
 New-Item -ItemType Directory -Force $output | Out-Null
 Copy-Item -LiteralPath "$build/libquickjs.dll" -Destination $output
@@ -72,6 +75,13 @@ foreach ($symbol in $expected) {
     if (-not ($exports -match "\b$symbol\b")) { throw "Missing JNI export: $symbol" }
 }
 $exports | Set-Content "$output/exports.txt"
+$dependents = & dumpbin /nologo /dependents $dll
+if ($LASTEXITCODE -ne 0) { throw 'Cannot inspect DLL imports.' }
+$dependents | Set-Content "$output/dependents.txt"
+$recipeHashes = @{}
+Get-ChildItem "$PSScriptRoot/quickjs" -Recurse -File | ForEach-Object {
+    $recipeHashes[$_.FullName.Substring($PSScriptRoot.Length + 1).Replace('\', '/')] = (Get-FileHash $_.FullName -Algorithm SHA256).Hash.ToLowerInvariant()
+}
 Copy-Item "$source/LICENSE.txt" "$output/QuickJS-KT-LICENSE.txt"
 Copy-Item "$source/quickjs/native/quickjs/LICENSE" "$output/QuickJS-LICENSE.txt"
 Copy-Item "$source/quickjs/native/c-vector/LICENSE" "$output/c-vector-LICENSE.txt"
@@ -83,6 +93,7 @@ $provenance = [ordered]@{
     windowsSdk = $env:WindowsSDKVersion; msvc = $env:VCToolsVersion
     dllSha256 = (Get-FileHash $dll -Algorithm SHA256).Hash.ToLowerInvariant()
     jniExportCount = $expected.Count
+    recipeSha256 = $recipeHashes
 }
 $provenance | ConvertTo-Json | Set-Content "$output/provenance.json"
 Write-Output "Built and verified $dll. Run the separate JVM smoke test before accepting this runtime."

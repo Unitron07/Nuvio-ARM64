@@ -30,7 +30,8 @@ fun main() = runBlocking {
                 check(js.evaluate<String>("await nativeAsync()") == "resolved")
                 check(js.evaluate<Long>("await Promise.resolve(42)") == 42L)
                 check(js.evaluate<Long>("const a = new Int32Array(new SharedArrayBuffer(4)); Atomics.add(a, 0, 7); Atomics.load(a, 0)") == 7L)
-                check(js.evaluate<String>("Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, 2)") == "timed-out")
+                // QuickJS-KT does not opt into blocking Atomics.wait on its JVM threads.
+                check(js.evaluate<Boolean>("try { Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, 2); false } catch(e) { e instanceof TypeError }") )
             }
         }
     }
