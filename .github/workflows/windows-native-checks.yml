@@ -1,0 +1,18 @@
+name: Windows native architecture checks
+on:
+  pull_request:
+    paths:
+      - scripts/windows/**
+      - composeApp/build.gradle.kts
+      - .github/workflows/windows-native-checks.yml
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  pe-validation:
+    runs-on: windows-2022
+    steps:
+      - uses: actions/checkout@v6
+      - name: Reject mixed architectures and malformed native inputs
+        shell: powershell
+        run: ./scripts/windows/test-pe-architecture.ps1
