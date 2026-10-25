@@ -163,5 +163,27 @@ upstream `CONTRIBUTING.md`, including approval and evidence where required.
 
 ## Validation results
 
-Results are recorded in the draft PR. The focused Compose tests exclude the
-unavailable native player build; they do not validate ARM64 playback or packaging.
+| Check | Result |
+| --- | --- |
+| PE validator regression suite | 10 checks passed locally and on Windows GitHub Actions |
+| Original bundled media DLL inspection | Both libmpv and torrent engine confirmed AMD64 `0x8664` |
+| Gradle configuration on ARM64 JDK 21 | Passed |
+| Kotlin desktop application and test compilation | Passed with a 6 GiB compiler allowance; initial 2 GiB attempt exhausted memory |
+| `DesktopVerticalDragScrollTest` | All four tests passed: vertical drag, tap activation, horizontal shelf drag, secondary-button rejection |
+| Missing ARM64 prerequisites | Build refuses to select bundled x64 libmpv |
+| PR metadata check and diff whitespace | Passed |
+| Native ARM64 playback, full touchscreen use, x64 regressions and MSI | Still pending |
+
+The focused Compose tests compile the application and execute only the new test
+class, excluding unavailable native-player tasks. They do not validate ARM64
+playback or packaging. Reproduction command, with an empty `local.properties`
+for these input-only tests:
+
+```powershell
+.\gradlew.bat :composeApp:desktopTest `
+  --tests com.nuvio.app.core.ui.DesktopVerticalDragScrollTest `
+  -x verifyWindowsArm64Inputs -x buildWindowsPlayerBridge `
+  -x prepareWindowsPlayerRuntime -x generateWindowsPlayerRuntimeIndex `
+  "-Dorg.gradle.jvmargs=-Xmx6g" "-Pkotlin.compiler.execution.strategy=in-process" `
+  --max-workers=2 --no-configuration-cache --no-daemon
+```
