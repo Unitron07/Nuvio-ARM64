@@ -18,7 +18,7 @@ add_library(quickjs SHARED ${jni}
   "${native}/quickjs/quickjs.c" "${native}/quickjs/cutils.c"
   "${native}/quickjs/dtoa.c" "${native}/quickjs/libregexp.c"
   "${native}/quickjs/libunicode.c" "${native}/common/quickjs_version.c"
-  "${native}/common/quickjs_interrupt.c" win32-compat.c wide-integer.c)
+  "${native}/common/quickjs_interrupt.c" win32-compat.c wide-integer.c diagnose-abort.c)
 set_target_properties(quickjs PROPERTIES PREFIX "lib" C_STANDARD 11
   MSVC_RUNTIME_LIBRARY "MultiThreaded")
 target_include_directories(quickjs PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}/include"
@@ -29,7 +29,7 @@ target_compile_definitions(quickjs PRIVATE CONFIG_WIN32 CONFIG_BIGNUM
   CONFIG_VERSION="${version}" _CRT_SECURE_NO_WARNINGS WIN32_LEAN_AND_MEAN NOMINMAX)
 # Keep the engine's native 64-bit BigInt limbs. The small wide-integer helper
 # supplies Clang's unsigned division builtins absent from the MSVC runtime.
-target_compile_options(quickjs PRIVATE /clang:-std=gnu11 /FIstdlib.h /FImalloc.h)
+target_compile_options(quickjs PRIVATE /clang:-std=gnu11 /FIstdlib.h /FImalloc.h "/FI${CMAKE_CURRENT_SOURCE_DIR}/diagnose-abort.h")
 # JNIEXPORT supplies the public JNI symbols. Do not use the upstream .def,
 # which exports the generic C API for Kotlin/Native rather than the JNI ABI.
 target_link_options(quickjs PRIVATE /INCREMENTAL:NO /Brepro)
