@@ -14,6 +14,7 @@ fun main() = runBlocking {
         repeat(3) {
             QuickJs.create(Dispatchers.Default).use { js ->
                 check(js.evaluate<Long>("21 * 2") == 42L)
+                check(js.evaluate<String>("String((2n ** 100n) / 3n)") == "422550200076076467165567735125")
                 val text = "Nuvio \u0000 \uD83D\uDE80 \u6F22\u5B57"
                 js.function("nativeText") { text }
                 check(js.evaluate<String>("nativeText()") == text)

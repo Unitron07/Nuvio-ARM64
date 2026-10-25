@@ -27,7 +27,9 @@ target_include_directories(quickjs PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}/include"
   "${java_home}/include" "${java_home}/include/win32")
 target_compile_definitions(quickjs PRIVATE CONFIG_WIN32 CONFIG_BIGNUM
   CONFIG_VERSION="${version}" _CRT_SECURE_NO_WARNINGS WIN32_LEAN_AND_MEAN NOMINMAX)
-target_compile_options(quickjs PRIVATE /clang:-std=gnu11 /FIstdlib.h /FImalloc.h)
+# Select QuickJS's supported 32-bit BigInt limbs: MSVC's runtime does not
+# provide Clang's __udivti3 helper for 128-bit division. JSValue/JNI stay 64-bit.
+target_compile_options(quickjs PRIVATE /clang:-std=gnu11 /U__SIZEOF_INT128__ /FIstdlib.h /FImalloc.h)
 # JNIEXPORT supplies the public JNI symbols. Do not use the upstream .def,
 # which exports the generic C API for Kotlin/Native rather than the JNI ABI.
 target_link_options(quickjs PRIVATE /INCREMENTAL:NO /Brepro)
