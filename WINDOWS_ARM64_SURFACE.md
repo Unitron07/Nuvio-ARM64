@@ -1,8 +1,146 @@
 # Windows ARM64 and Surface Pro 11
 
-Status: initial implementation for review, **not a working ARM64 installer yet**.
+Status: native Windows ARM64 QuickJS JNI built and smoke-tested;
+**not a working ARM64 application or installer yet**.
 Baseline: [NuvioMedia/NuvioDesktop Dev](https://github.com/NuvioMedia/NuvioDesktop/tree/5e18596aa919a6a4e7b6cdee7f90dfaabbf71b00), commit `5e18596aa919a6a4e7b6cdee7f90dfaabbf71b00`.
 Inspection: October 24–25, 2026.
+
+## Stage 2: QuickJS JNI source build
+
+Stage 2 starts at merged `main` commit
+`f14296e7e2f38cef5acedc1831d927f0161029b0` (PR #1). The only other branch,
+`arm64-surface-foundation`, is merged. Upstream `Dev` remains the recorded
+`5e18596aa919a6a4e7b6cdee7f90dfaabbf71b00` baseline. Existing PE/touch work is
+retained. Latest foundation PE and PR-template Actions runs passed; an older
+PR-template failure was corrected before merging.
+
+The new `scripts/windows/build-quickjs.ps1` builds the **QuickJS-KT JNI bridge**,
+not just the QuickJS C API. It pins QuickJS-KT 1.0.15 to
+`a081755bcdb18ee6afa7ffee25b8fa976f06d31f`, Bellard QuickJS to
+`04be246001599f5995fa2f2d8c91a0f198d3f34c`, and c-vector to
+`774773d4cb1e66dd736e90e7f482d4f22af464c6`. Dirty source trees are rejected.
+The isolated CMake configuration includes the unchanged JNI and mapping sources.
+One explicit engine-source patch is applied to a build copy: `JSClosureVar`'s
+three-bit `closure_type` is made `unsigned int`. MSVC-mode Clang 22 reads enum
+values 4–7 as negative in a signed three-bit field, reaching the closure dispatch
+abort when a script references globals. Native tests cover `String(42)` and
+captured lexical variables. The original source checkout stays clean; the
+provenance manifest records the compiled engine hash and patch. The engine also
+keeps its usual 64-bit BigInt limbs, with a small unsigned 128-bit division helper
+for the Microsoft runtime; 22 independent quotient/remainder vectors test it.
+`-fwrapv` matches the signed-overflow contract in Bellard's Makefile.
+Bellard's GNU C extensions require Clang; use **clang-cl targeting the MSVC ABI**,
+MSVC ARM64 libraries and Windows SDK rather than claiming plain `cl` support.
+The private Win32 compatibility layer covers only the mutex, condition variable
+and realtime clock functions used by these pinned sources. It preserves recursive
+JNI locking and QuickJS Atomics; it is not a general pthread implementation.
+The static C runtime avoids a separate winpthreads DLL and permits QuickJS-KT's
+single-resource extraction/loading behavior. Notices, source pins, toolchain
+versions, DLL SHA256 and JNI export listing accompany the output.
+
+Prerequisites: Windows JDK 21, Visual Studio C++ tools for the target architecture,
+Windows SDK, LLVM clang-cl, CMake, Ninja, Git and network access. With an ARM64
+JDK in `JAVA_HOME`, from a fresh checkout on Surface Pro 11:
+
+```powershell
+./scripts/windows/build-quickjs.ps1 -Architecture arm64
+./gradlew.bat -p scripts/windows/quickjs-smoke run `
+  "-PquickjsDll=$pwd/build/windows-quickjs/arm64/libquickjs.dll" `
+  -PexpectedArch=aarch64 --no-daemon --console=plain
+```
+
+This tests the published Kotlin artifact and actual `jni/windows_aarch64`
+resource loader with `-Xcheck:jni`, including initialization, evaluation, Unicode
+and embedded NUL, exceptions/recovery, synchronous callbacks, suspending callbacks,
+promise jobs, Atomics and repeated disposal. A separate workflow runs ARM64 on
+`windows-11-arm` and x64 regression on `windows-2022`; artifacts are JNI runtime
+bundles, **not application images**. The original x64 release workflow is untouched.
+Successful source compilation alone does not establish JNI ABI compatibility.
+
+For application staging after this test passes, pass
+`-Pnuvio.windows.quickjs.dll=<checkout>/build/windows-quickjs/arm64/libquickjs.dll`
+to the existing app tasks, together with the libmpv and WebView2 properties below.
+
+At initial implementation time the local host has an ARM64 JDK but no installed
+MSVC/Windows SDK/LLVM C++ toolchain. Native CI execution and local DLL smoke results
+are recorded below when available. libmpv's complete ARM64 runtime, the player
+bridge, full application startup and HTTP/debrid playback remain separate gates.
+No MSI or release is produced by this milestone.
+
+### Stage 2 verified results
+
+The [native CI run 40170624286](https://github.com/Unitron07/Nuvio-ARM64/actions/runs/40170624286)
+passes on Windows ARM64 and Windows x64. Both build the actual JNI DLL, verify
+all 29 declared JNI exports and matching PE architecture, and run the Win32
+synchronization test plus all 22 division/remainder golden vectors. The complete
+published-API JVM smoke test passes on both architectures, including global and
+captured lexical references, BigInt, strings/NUL, callbacks, exception recovery,
+coroutine/promise jobs, Atomics and three engine creation/disposal cycles.
+The supplied ARM64 DLL imports only `KERNEL32.dll`; no private runtime DLL or
+MSYS2 installation is needed for this QuickJS build.
+
+The [final code/provenance CI run 40170698966](https://github.com/Unitron07/Nuvio-ARM64/actions/runs/40170698966)
+also passes both architectures. The same ARM64 DLL passes the complete resource
+loader/JVM suite locally on this Surface with Microsoft ARM64 JDK 21.0.12.1+1.
+DLL SHA256: `ceef75214ac8ac3995acae17c86724ecc43ffed165c4fc7b6e7aa1181a3ef110`.
+The CI bundles include `VALIDATION_STATUS.txt`; a retained artifact with failed
+smoke status is diagnostic only. Source/build provenance belongs to code commit
+`40d90e63ddc1e2136e30dd4fd7d552c9c38edd3a`.
+
+`-Xcheck:jni` emits warnings about unchecked exceptions after
+`CallStaticObjectMethod` in the pinned JNI bridge on both architectures. They do
+not fail the smoke suite, but the JNI exception discipline still needs auditing;
+these are not warning-free tests. This validates the QuickJS dependency rather
+than all plugin services or the full application. The original x64 application
+release pipeline and touch implementation are unchanged; full x64 app, provider,
+playback and input regression runs were not repeated for this tooling milestone.
+
+### libmpv candidate investigation (not accepted for staging)
+
+The mpv.io-linked shinchiro builder publishes an actual ARM64 libmpv. The inspected
+candidate is [20261021 mpv-dev-aarch64](https://github.com/shinchiro/mpv-winbuild-cmake/releases/tag/20261021),
+archive `mpv-dev-aarch64-20261021-git-e471496c56.7z`, SHA256
+`015f133399b3525021b6d937cf54ace2761d4f70224d5e62f5df24191b28f398`
+(matches GitHub's published asset digest). Its builder workflow
+[39518569492](https://github.com/shinchiro/mpv-winbuild-cmake/actions/runs/39518569492)
+ran build recipe `1f8d2e76255abc48f0456d9be99b4cab9c6566e6`.
+The matching source commits resolve to mpv
+`e471496c56f0f49c133bd88b50aed62b845f1909` and FFmpeg
+`9a861e9687d30e657d59521817cad18405995983`.
+
+Observed on this Surface Pro 11 / Snapdragon X X1P64100, Windows build
+26100.9711, Microsoft ARM64 JDK 21.0.12.1+1, JNA 5.19.1:
+
+- PE machine is `0xAA64`. `mpv_create`, option setting, `mpv_initialize` and
+  property queries execute in the ARM64 JVM. Reported versions match the pins.
+- **`mpv_terminate_destroy` crashes the JVM with native exception `0xe24c4a02`.**
+  Reproduced twice, including phase markers confirming the crash happens before
+  destruction returns, before unloading the library. Root cause is not established.
+- The development archive contains headers, an import library and one DLL; its
+  import table includes `vulkan-1.dll`, an external dependency not supplied by that
+  archive. This host has a Vulkan installation; load success here does not prove
+  a self-contained distribution. Audit that closure and driver interaction.
+- The candidate reports libass/libcurl support in its build configuration and
+  statically preferred dependencies. Actual codecs, HTTP streaming, subtitles,
+  D3D11/D3D11VA and cleanup still need validation. No playback was attempted after
+  the initialization/cleanup failure.
+
+Reproduce the isolated failure without provider credentials:
+
+```powershell
+# Download/extract the exact archive above and verify its hash first.
+# Use the JNA 5.19.1 JAR already resolved by the application.
+& "$env:JAVA_HOME/bin/java.exe" '-XX:ErrorFile=hs_err_pid%p.log' `
+  -cp C:/deps/jna-5.19.1.jar scripts/windows/MpvProbe.java `
+  C:/deps/mpv-arm64/libmpv-2.dll
+```
+
+Do not bundle this candidate on the strength of architecture alone. Resolve the
+cleanup failure and native dependency closure, and retain all corresponding
+source/build recipes and notices before distribution. A builder snapshot alone
+does not freeze its moving git dependencies; any source rebuild must also pin
+the complete recipe dependency graph. The QuickJS milestone can be reviewed and
+used independently while this media runtime gate remains open.
 
 ## Scope
 
@@ -19,7 +157,7 @@ The x64 build retains its existing engine and playback functionality.
 | Window/UI renderer | Swing/AWT, Compose and Skiko | Use an ARM64 JVM and matching Skiko native libraries. Compose documents Windows ARM64 support. |
 | Windows player | JNI C++17 `player_bridge.cpp`, libmpv, Direct3D 11 | Compile the bridge with MSVC ARM64 and supply an ARM64 libmpv DLL plus matching dependencies. |
 | Player controls | Local HTML/CSS/JavaScript hosted in WebView2 | Use the SDK's `build/native/arm64` loader and the ARM64 WebView2 Runtime. Audit pointer interactions independently of Compose. |
-| Plugins | QuickJS-KT 1.0.15 JNI | The downloaded Maven JAR contains `jni/windows_x64/libquickjs.dll`, with no `windows_aarch64` resource. An ARM64 JNI build is required for plugins and startup. |
+| Plugins | QuickJS-KT 1.0.15 JNI | Maven has only the Windows x64 DLL. The Stage 2 source build now supplies a tested ARM64 JNI DLL through the existing `windows_aarch64` resource staging. Full plugin startup remains to be tested. |
 | Debrid/networking | Kotlin services, Ktor, OkHttp | Retain existing provider integration, authentication, source selection and HTTP streaming. Test using the user's provider after a native build exists. |
 | Other native pieces | JNA; generated/bundled runtime libraries | Audit resolved artifacts and extracted DLLs, including the JDK and Skiko, before shipping. |
 | Torrent engine | Bundled x64 `nuvio_engine.dll`; architecture guard in `DesktopEngineLibrary` | Keep unsupported on Windows ARM64 per user scope. |
@@ -87,9 +225,10 @@ target is Kotlin/JVM. Verify the actual resolved desktop dependency graph.
 Supply a real ARM64 runtime directory containing `libmpv-2.dll` and its dependent
 DLLs. Supply an ARM64 build of QuickJS-KT's JNI bridge from the matching 1.0.15
 source, with its expected JNI exports; a generic QuickJS DLL is insufficient.
-The QuickJS upstream build currently has only a Windows x64 toolchain recipe,
-so adding an ARM64 cross-build and verifying exception/string/coroutine behavior
-is the main additional porting task. Record exact source revisions and hashes.
+The upstream QuickJS build has only a Windows x64 recipe. The Stage 2 build above
+adds the Microsoft-ABI ARM64 port and verifies exception/string/coroutine behavior.
+The main remaining native runtime blocker is now libmpv cleanup and dependency
+closure. Record exact source revisions and hashes for every accepted runtime.
 
 Example, once these prerequisites exist:
 
@@ -109,7 +248,7 @@ The current release workflow remains x64; it has not been relabeled ARM64.
 
 ## Completion plan and acceptance gates
 
-1. **Native dependencies:** build matching QuickJS JNI; obtain/rebuild ARM64
+1. **Native dependencies:** QuickJS JNI is built and smoke-tested; obtain/rebuild ARM64
    libmpv with required codecs/subtitles and all dependencies. Use reproducible,
    pinned sources and preserve their licenses. Compile the existing player bridge
    with ARM64 MSVC and link ARM64 WebView2. Check exports and dependency loading.
@@ -142,7 +281,8 @@ The current release workflow remains x64; it has not been relabeled ARM64.
 
 The original `LICENSE`, notices, vendored licenses and upstream Git history are
 retained. This repository was initially empty and independent on GitHub; its
-`main` now contains the upstream `Dev` history, with changes on a separate branch.
+`main` now contains the upstream `Dev` history and merged foundation PR #1;
+Stage 2 changes are on a separate branch.
 It is not a GitHub fork-network member. This is an unofficial derivative.
 
 Before distributing binaries, include the applicable notices and corresponding

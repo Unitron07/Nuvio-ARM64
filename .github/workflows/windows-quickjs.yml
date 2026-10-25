@@ -1,0 +1,63 @@
+name: Windows QuickJS JNI
+on:
+  pull_request:
+    paths:
+      - scripts/windows/**
+      - .github/workflows/windows-quickjs.yml
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  native-jni:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - runner: windows-11-arm
+            arch: arm64
+            javaArch: aarch64
+            osArch: aarch64
+          - runner: windows-2022
+            arch: x64
+            javaArch: x64
+            osArch: amd64
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-java@v5
+        with:
+          distribution: microsoft
+          java-version: '21'
+          architecture: ${{ matrix.javaArch }}
+      - name: Build pinned QuickJS-KT JNI with MSVC ABI
+        id: native
+        shell: pwsh
+        run: |
+          ./scripts/windows/build-quickjs.ps1 -Architecture '${{ matrix.arch }}'
+      - name: Load resource and exercise the published Kotlin JNI API
+        id: smoke
+        shell: pwsh
+        run: |
+          ./gradlew.bat -p scripts/windows/quickjs-smoke run `
+            "-PquickjsDll=$pwd/build/windows-quickjs/${{ matrix.arch }}/libquickjs.dll" `
+            '-PexpectedArch=${{ matrix.osArch }}' --no-daemon --console=plain
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+      - name: Record artifact validation status
+        if: always()
+        shell: pwsh
+        run: |
+          $output = 'build/windows-quickjs/${{ matrix.arch }}'
+          if (Test-Path $output) {
+            @('NATIVE_BUILD=${{ steps.native.outcome }}', 'JVM_SMOKE=${{ steps.smoke.outcome }}',
+              'SOURCE_COMMIT=${{ github.event.pull_request.head.sha || github.sha }}',
+              'This is a JNI dependency bundle, not a Nuvio application. Failed smoke results mean diagnostic use only.') |
+              Set-Content "$output/VALIDATION_STATUS.txt"
+          }
+      - uses: actions/upload-artifact@v6
+        if: always()
+        with:
+          name: quickjs-kt-1.0.15-windows-${{ matrix.arch }}
+          path: build/windows-quickjs/${{ matrix.arch }}/
+          if-no-files-found: warn
+          retention-days: 14
