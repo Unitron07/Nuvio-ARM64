@@ -9,7 +9,8 @@ endif()
 if(NOT DEFINED QUICKJS_KT_SOURCE OR NOT DEFINED ENV{JAVA_HOME})
   message(FATAL_ERROR "QUICKJS_KT_SOURCE and JAVA_HOME are required")
 endif()
-set(native "${QUICKJS_KT_SOURCE}/quickjs/native")
+file(TO_CMAKE_PATH "${QUICKJS_KT_SOURCE}/quickjs/native" native)
+file(TO_CMAKE_PATH "$ENV{JAVA_HOME}" java_home)
 file(READ "${native}/quickjs/VERSION" version)
 string(STRIP "${version}" version)
 file(GLOB_RECURSE jni CONFIGURE_DEPENDS "${native}/jni/*.c")
@@ -23,7 +24,7 @@ set_target_properties(quickjs PROPERTIES PREFIX "lib" C_STANDARD 11
 target_include_directories(quickjs PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}/include"
   "${native}/quickjs" "${native}/common" "${native}/c-vector"
   "${native}/jni" "${native}/jni/mapping"
-  "$ENV{JAVA_HOME}/include" "$ENV{JAVA_HOME}/include/win32")
+  "${java_home}/include" "${java_home}/include/win32")
 target_compile_definitions(quickjs PRIVATE CONFIG_WIN32 CONFIG_BIGNUM
   CONFIG_VERSION="${version}" _CRT_SECURE_NO_WARNINGS WIN32_LEAN_AND_MEAN NOMINMAX)
 target_compile_options(quickjs PRIVATE /clang:-std=gnu11 /FIstdlib.h /FImalloc.h)
