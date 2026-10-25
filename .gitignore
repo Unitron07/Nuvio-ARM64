@@ -33,6 +33,7 @@ AGENTS.md
 
 PERFORMANCE_FINDINGS.md
 scripts/*
+!scripts/windows/
 !scripts/sign-ios-device-app.py
 iosApp/Configuration/DeviceSigning.local.json
 

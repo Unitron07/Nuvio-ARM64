@@ -720,16 +720,16 @@ val buildLinuxPlayerBridge = tasks.register<Exec>("buildLinuxPlayerBridge") {
 
 val windowsPlayerBridgeArch = when (System.getProperty("os.arch").lowercase()) {
     "aarch64", "arm64" -> "arm64"
-    "x86" -> "x86"
-    else -> "x64"
+    "amd64", "x86_64", "x64" -> "x64"
+    else -> if (isWindowsHost) error("Unsupported Windows JVM architecture: ${System.getProperty("os.arch")}") else "x64"
 }
 val windowsPlayerBridgeSource = layout.projectDirectory.file("src/desktopMain/native/windows/player_bridge.cpp")
-val windowsPlayerBridgeOutput = layout.buildDirectory.file("native/windows/player_bridge.dll")
-val windowsPlayerBridgeImportLib = layout.buildDirectory.file("native/windows/player_bridge.lib")
-val windowsPlayerBridgePdb = layout.buildDirectory.file("native/windows/player_bridge.pdb")
-val windowsPlayerBridgeObj = layout.buildDirectory.file("native/windows/player_bridge.obj")
-val windowsPlayerBridgeScript = layout.buildDirectory.file("native/windows/build-player-bridge.bat")
-val windowsPlayerRuntimeOutput = layout.buildDirectory.dir("native/windows-runtime")
+val windowsPlayerBridgeOutput = layout.buildDirectory.file("native/windows/$windowsPlayerBridgeArch/player_bridge.dll")
+val windowsPlayerBridgeImportLib = layout.buildDirectory.file("native/windows/$windowsPlayerBridgeArch/player_bridge.lib")
+val windowsPlayerBridgePdb = layout.buildDirectory.file("native/windows/$windowsPlayerBridgeArch/player_bridge.pdb")
+val windowsPlayerBridgeObj = layout.buildDirectory.file("native/windows/$windowsPlayerBridgeArch/player_bridge.obj")
+val windowsPlayerBridgeScript = layout.buildDirectory.file("native/windows/$windowsPlayerBridgeArch/build-player-bridge.bat")
+val windowsPlayerRuntimeOutput = layout.buildDirectory.dir("native/windows-runtime/$windowsPlayerBridgeArch")
 if (isWindowsHost) {
     windowsPlayerBridgeOutput.get().asFile.parentFile.mkdirs()
 }
@@ -747,7 +747,8 @@ val windowsLibmpvRuntimeDirOverride = providers.gradleProperty("nuvio.windows.li
     ?.takeIf { it.isNotBlank() }
     ?.let(::File)
 val windowsLibmpvRuntimeDir = windowsLibmpvRuntimeDirOverride
-    ?: bundledWindowsLibmpvRuntimeDir.takeIf { File(it, "libmpv-2.dll").exists() }
+    ?: File(bundledWindowsLibmpvRuntimeDir, windowsPlayerBridgeArch).takeIf { File(it, "libmpv-2.dll").exists() }
+    ?: bundledWindowsLibmpvRuntimeDir.takeIf { windowsPlayerBridgeArch == "x64" && File(it, "libmpv-2.dll").exists() }
 val windowsLibmpvDllOverride = providers.gradleProperty("nuvio.windows.libmpv.dll").orNull
     ?.takeIf { it.isNotBlank() }
     ?.let(::File)
@@ -756,7 +757,10 @@ val windowsLibmpvDll = windowsLibmpvDllOverride
     ?: listOf(
         File("C:/msys64/ucrt64/bin/libmpv-2.dll"),
         File("C:/msys64/mingw64/bin/libmpv-2.dll"),
-    ).firstOrNull(File::exists)
+    ).firstOrNull { windowsPlayerBridgeArch == "x64" && it.exists() }
+val windowsQuickJsDll = providers.gradleProperty("nuvio.windows.quickjs.dll").orNull
+    ?.takeIf { it.isNotBlank() }?.let { rootProject.file(it) }
+    ?: layout.projectDirectory.file("src/desktopMain/native/windows/quickjs/arm64/libquickjs.dll").asFile
 val windowsCppRuntimeDllNames = listOf(
     "vcruntime140.dll",
     "vcruntime140_1.dll",
@@ -876,9 +880,39 @@ val windowsPlayerBridgeCommand = if (missingWindowsPlayerBridgeInputs.isNotEmpty
         powershellCommand,
     )
 }
+// All in-process native libraries must match the running JVM. The legacy bundled
+// media DLLs are x64; fail explicitly rather than producing a broken ARM64 package.
+val verifyWindowsArm64Inputs = tasks.register<Exec>("verifyWindowsArm64Inputs") {
+    group = "verification"
+    description = "Checks ARM64 media, QuickJS and WebView2 binaries before building."
+    enabled = isWindowsHost && windowsPlayerBridgeArch == "arm64"
+    val verifier = rootProject.file("scripts/windows/verify-pe-architecture.ps1")
+    val paths = listOf(
+        windowsLibmpvDll ?: File("__missing_arm64_libmpv__/libmpv-2.dll"),
+        windowsLibmpvRuntimeDir ?: windowsLibmpvDll?.parentFile ?: File("__missing_arm64_libmpv__"),
+        windowsQuickJsDll,
+        windowsWebView2LoaderDll,
+    ) + windowsCppRuntimeDlls
+    inputs.file(verifier)
+    doFirst {
+        require(windowsLibmpvDll?.isFile == true) {
+            "ARM64 libmpv is missing. Supply -Pnuvio.windows.libmpv.runtimeDir=C:/path/to/arm64-dlls."
+        }
+        require(windowsQuickJsDll.isFile) {
+            "ARM64 QuickJS JNI is missing. Supply -Pnuvio.windows.quickjs.dll=C:/path/to/arm64/libquickjs.dll."
+        }
+    }
+    // Execute every time, including when a supplied input is missing.
+    val pathArguments = paths.joinToString(",") { psSingleQuote(it.absolutePath) }
+    commandLine("powershell", "-NoProfile", "-ExecutionPolicy", "Bypass", "-Command",
+        "& ${psSingleQuote(verifier.absolutePath)} -Architecture arm64 -Path @($pathArguments)")
+}
 val buildWindowsPlayerBridge = tasks.register<Exec>("buildWindowsPlayerBridge") {
     notCompatibleWithConfigurationCache("Builds a host-local player bridge against WebView2 and libmpv for Windows.")
     enabled = isWindowsHost
+    dependsOn(verifyWindowsArm64Inputs)
+    inputs.property("architecture", windowsPlayerBridgeArch)
+    inputs.file(rootProject.file("scripts/windows/verify-pe-architecture.ps1"))
     inputs.file(windowsPlayerBridgeSource)
     if (windowsWebView2IncludeDir.exists()) {
         inputs.dir(windowsWebView2IncludeDir)
@@ -889,8 +923,15 @@ val buildWindowsPlayerBridge = tasks.register<Exec>("buildWindowsPlayerBridge") 
     outputs.file(windowsPlayerBridgeOutput)
     outputs.file(windowsPlayerBridgeImportLib)
     outputs.file(windowsPlayerBridgePdb)
-    onlyIf { !windowsPlayerBridgeOutput.get().asFile.exists() }
     commandLine(windowsPlayerBridgeCommand)
+    doLast {
+        providers.exec {
+            commandLine("powershell", "-NoProfile", "-ExecutionPolicy", "Bypass", "-File",
+                rootProject.file("scripts/windows/verify-pe-architecture.ps1").absolutePath,
+                "-Architecture", windowsPlayerBridgeArch,
+                "-Path", windowsPlayerBridgeOutput.get().asFile.absolutePath)
+        }.result.get().assertNormalExitValue()
+    }
 }
 
 val prepareWindowsPlayerRuntime = tasks.register<Sync>("prepareWindowsPlayerRuntime") {
@@ -919,6 +960,19 @@ val generateWindowsPlayerRuntimeIndex = tasks.register<GenerateNativeRuntimeInde
     dependsOn(prepareWindowsPlayerRuntime)
     runtimeDir.set(windowsPlayerRuntimeOutput)
     indexFile.set(windowsPlayerRuntimeOutput.map { it.file("runtime-files.txt") })
+}
+
+// Resources are also on the development/test classpath; packaging only into
+// desktopJar would leave Gradle :run unable to find the supplied ARM64 libraries.
+val prepareWindowsNativeExtras = tasks.register<Sync>("prepareWindowsNativeExtras") {
+    enabled = isWindowsHost
+    into(layout.buildDirectory.dir("generated/windows-native-extras/$windowsPlayerBridgeArch"))
+    if (windowsPlayerBridgeArch == "arm64") {
+        from(windowsQuickJsDll) {
+            into("jni/windows_aarch64")
+            rename { "libquickjs.dll" }
+        }
+    }
 }
 
 abstract class GenerateNativeRuntimeIndexTask : DefaultTask() {
@@ -968,8 +1022,12 @@ tasks.withType<Jar>().configureEach {
         from(windowsPlayerRuntimeOutput) {
             into("native/windows")
         }
-        from(layout.projectDirectory.file("src/desktopMain/native/windows/engine/nuvio_engine.dll")) {
-            into("native/windows")
+        // The fork's ARM64 target uses debrid/HTTP streams. Keep the upstream
+        // x64 torrent engine on x64 only; the existing ARM64 P2P guard remains.
+        if (windowsPlayerBridgeArch == "x64") {
+            from(layout.projectDirectory.file("src/desktopMain/native/windows/engine/nuvio_engine.dll")) {
+                into("native/windows")
+            }
         }
     }
     if (isLinuxHost && name == "desktopJar") {
@@ -1164,6 +1222,7 @@ kotlin {
             }
         }
         val desktopMain by getting {
+            if (isWindowsHost) resources.srcDir(prepareWindowsNativeExtras)
             kotlin.srcDir(fullPluginSourceDir)
             kotlin.srcDir(fullTrailerSourceDir)
             kotlin.srcDir(
