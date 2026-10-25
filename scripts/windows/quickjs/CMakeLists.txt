@@ -29,7 +29,8 @@ target_compile_definitions(quickjs PRIVATE CONFIG_WIN32 CONFIG_BIGNUM
   CONFIG_VERSION="${version}" _CRT_SECURE_NO_WARNINGS WIN32_LEAN_AND_MEAN NOMINMAX)
 # Keep the engine's native 64-bit BigInt limbs. The small wide-integer helper
 # supplies Clang's unsigned division builtins absent from the MSVC runtime.
-target_compile_options(quickjs PRIVATE /clang:-std=gnu11 /FIstdlib.h /FImalloc.h "/FI${CMAKE_CURRENT_SOURCE_DIR}/diagnose-abort.h")
+# Match Bellard's Makefile: the engine requires wrapping signed arithmetic.
+target_compile_options(quickjs PRIVATE /clang:-std=gnu11 /clang:-fwrapv /FIstdlib.h /FImalloc.h "/FI${CMAKE_CURRENT_SOURCE_DIR}/diagnose-abort.h")
 # JNIEXPORT supplies the public JNI symbols. Do not use the upstream .def,
 # which exports the generic C API for Kotlin/Native rather than the JNI ABI.
 target_link_options(quickjs PRIVATE /INCREMENTAL:NO /Brepro)
