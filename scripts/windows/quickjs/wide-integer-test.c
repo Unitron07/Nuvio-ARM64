@@ -42,4 +42,3 @@ int main(void) {
     puts("PASS: 22 unsigned 128-bit division/remainder golden vectors");
     return 0;
 }
-
