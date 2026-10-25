@@ -19,6 +19,15 @@ not just the QuickJS C API. It pins QuickJS-KT 1.0.15 to
 `04be246001599f5995fa2f2d8c91a0f198d3f34c`, and c-vector to
 `774773d4cb1e66dd736e90e7f482d4f22af464c6`. Dirty source trees are rejected.
 The isolated CMake configuration includes the unchanged JNI and mapping sources.
+One explicit engine-source patch is applied to a build copy: `JSClosureVar`'s
+three-bit `closure_type` is made `unsigned int`. MSVC-mode Clang 22 reads enum
+values 4–7 as negative in a signed three-bit field, reaching the closure dispatch
+abort when a script references globals. Native tests cover `String(42)` and
+captured lexical variables. The original source checkout stays clean; the
+provenance manifest records the compiled engine hash and patch. The engine also
+keeps its usual 64-bit BigInt limbs, with a small unsigned 128-bit division helper
+for the Microsoft runtime; 22 independent quotient/remainder vectors test it.
+`-fwrapv` matches the signed-overflow contract in Bellard's Makefile.
 Bellard's GNU C extensions require Clang; use **clang-cl targeting the MSVC ABI**,
 MSVC ARM64 libraries and Windows SDK rather than claiming plain `cl` support.
 The private Win32 compatibility layer covers only the mutex, condition variable

@@ -82,6 +82,15 @@ $exports | Set-Content "$output/exports.txt"
 $dependents = & dumpbin /nologo /dependents $dll
 if ($LASTEXITCODE -ne 0) { throw 'Cannot inspect DLL imports.' }
 $dependents | Set-Content "$output/dependents.txt"
+$imports = @($dependents | ForEach-Object {
+    if ($_ -match '^\s+([A-Za-z0-9_.-]+\.dll)\s*$') { $Matches[1] }
+})
+if ($imports.Count -eq 0) { throw 'No imports found; review dumpbin output.' }
+foreach ($dependency in $imports) {
+    if ($dependency -ine 'KERNEL32.dll') {
+        throw "Unexpected QuickJS DLL dependency: $dependency. The resource loader requires a self-contained JNI DLL."
+    }
+}
 $recipeHashes = @{}
 Get-ChildItem "$PSScriptRoot/quickjs" -Recurse -File | ForEach-Object {
     $recipeHashes[$_.FullName.Substring($PSScriptRoot.Length + 1).Replace('\', '/')] = (Get-FileHash $_.FullName -Algorithm SHA256).Hash.ToLowerInvariant()
@@ -98,6 +107,9 @@ $provenance = [ordered]@{
     dllSha256 = (Get-FileHash $dll -Algorithm SHA256).Hash.ToLowerInvariant()
     jniExportCount = $expected.Count
     recipeSha256 = $recipeHashes
+    quickjsSourcePatch = 'JSClosureVar.closure_type uses unsigned int instead of a signed MSVC enum bitfield'
+    compiledEngineSha256 = (Get-FileHash "$build/quickjs-msvc.c" -Algorithm SHA256).Hash.ToLowerInvariant()
+    imports = $imports
 }
 $provenance | ConvertTo-Json | Set-Content "$output/provenance.json"
 Write-Output "Built and verified $dll. Run the separate JVM smoke test before accepting this runtime."

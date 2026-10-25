@@ -31,16 +31,29 @@ jobs:
           java-version: '21'
           architecture: ${{ matrix.javaArch }}
       - name: Build pinned QuickJS-KT JNI with MSVC ABI
+        id: native
         shell: pwsh
         run: |
           ./scripts/windows/build-quickjs.ps1 -Architecture '${{ matrix.arch }}'
       - name: Load resource and exercise the published Kotlin JNI API
+        id: smoke
         shell: pwsh
         run: |
           ./gradlew.bat -p scripts/windows/quickjs-smoke run `
             "-PquickjsDll=$pwd/build/windows-quickjs/${{ matrix.arch }}/libquickjs.dll" `
             '-PexpectedArch=${{ matrix.osArch }}' --no-daemon --console=plain
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+      - name: Record artifact validation status
+        if: always()
+        shell: pwsh
+        run: |
+          $output = 'build/windows-quickjs/${{ matrix.arch }}'
+          if (Test-Path $output) {
+            @('NATIVE_BUILD=${{ steps.native.outcome }}', 'JVM_SMOKE=${{ steps.smoke.outcome }}',
+              'SOURCE_COMMIT=${{ github.event.pull_request.head.sha || github.sha }}',
+              'This is a JNI dependency bundle, not a Nuvio application. Failed smoke results mean diagnostic use only.') |
+              Set-Content "$output/VALIDATION_STATUS.txt"
+          }
       - uses: actions/upload-artifact@v6
         if: always()
         with:
