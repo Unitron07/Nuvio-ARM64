@@ -42,8 +42,9 @@ jobs:
             '-PexpectedArch=${{ matrix.osArch }}' --no-daemon --console=plain
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
       - uses: actions/upload-artifact@v6
+        if: always()
         with:
           name: quickjs-kt-1.0.15-windows-${{ matrix.arch }}
           path: build/windows-quickjs/${{ matrix.arch }}/
-          if-no-files-found: error
+          if-no-files-found: warn
           retention-days: 14

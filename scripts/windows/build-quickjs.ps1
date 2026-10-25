@@ -29,6 +29,10 @@ if (-not $VsDevCmd) {
 if (-not $VsDevCmd -or -not (Test-Path $VsDevCmd)) { throw 'VsDevCmd.bat was not found.' }
 # Import the target SDK/MSVC library environment for CMake and the linker.
 $hostArch = if ($env:PROCESSOR_ARCHITECTURE -eq 'ARM64') { 'arm64' } else { 'x64' }
+$nativeHost = [Runtime.InteropServices.RuntimeInformation]::OSArchitecture.ToString().ToLowerInvariant()
+if ($Architecture -ne $nativeHost -or $hostArch -ne $nativeHost) {
+    throw 'Use a native shell on a matching Windows host: this recipe executes native tests and does not accept emulation.'
+}
 $environmentScript = Join-Path $BuildRoot "msvc-environment-$Architecture.cmd"
 @('@echo off', "call `"$VsDevCmd`" -no_logo -arch=$Architecture -host_arch=$hostArch >nul",
   'if errorlevel 1 exit /b %errorlevel%', 'set') | Set-Content -LiteralPath $environmentScript -Encoding ASCII

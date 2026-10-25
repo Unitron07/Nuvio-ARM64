@@ -57,6 +57,53 @@ are recorded below when available. libmpv's complete ARM64 runtime, the player
 bridge, full application startup and HTTP/debrid playback remain separate gates.
 No MSI or release is produced by this milestone.
 
+### libmpv candidate investigation (not accepted for staging)
+
+The mpv.io-linked shinchiro builder publishes an actual ARM64 libmpv. The inspected
+candidate is [20261021 mpv-dev-aarch64](https://github.com/shinchiro/mpv-winbuild-cmake/releases/tag/20261021),
+archive `mpv-dev-aarch64-20261021-git-e471496c56.7z`, SHA256
+`015f133399b3525021b6d937cf54ace2761d4f70224d5e62f5df24191b28f398`
+(matches GitHub's published asset digest). Its builder workflow
+[39518569492](https://github.com/shinchiro/mpv-winbuild-cmake/actions/runs/39518569492)
+ran build recipe `1f8d2e76255abc48f0456d9be99b4cab9c6566e6`.
+The matching source commits resolve to mpv
+`e471496c56f0f49c133bd88b50aed62b845f1909` and FFmpeg
+`9a861e9687d30e657d59521817cad18405995983`.
+
+Observed on this Surface Pro 11 / Snapdragon X X1P64100, Windows build
+26100.9711, Microsoft ARM64 JDK 21.0.12.1+1, JNA 5.19.1:
+
+- PE machine is `0xAA64`. `mpv_create`, option setting, `mpv_initialize` and
+  property queries execute in the ARM64 JVM. Reported versions match the pins.
+- **`mpv_terminate_destroy` crashes the JVM with native exception `0xe24c4a02`.**
+  Reproduced twice, including phase markers confirming the crash happens before
+  destruction returns, before unloading the library. Root cause is not established.
+- The development archive contains headers, an import library and one DLL; its
+  import table includes `vulkan-1.dll`, an external dependency not supplied by that
+  archive. This host has a Vulkan installation; load success here does not prove
+  a self-contained distribution. Audit that closure and driver interaction.
+- The candidate reports libass/libcurl support in its build configuration and
+  statically preferred dependencies. Actual codecs, HTTP streaming, subtitles,
+  D3D11/D3D11VA and cleanup still need validation. No playback was attempted after
+  the initialization/cleanup failure.
+
+Reproduce the isolated failure without provider credentials:
+
+```powershell
+# Download/extract the exact archive above and verify its hash first.
+# Use the JNA 5.19.1 JAR already resolved by the application.
+& "$env:JAVA_HOME/bin/java.exe" '-XX:ErrorFile=hs_err_pid%p.log' `
+  -cp C:/deps/jna-5.19.1.jar scripts/windows/MpvProbe.java `
+  C:/deps/mpv-arm64/libmpv-2.dll
+```
+
+Do not bundle this candidate on the strength of architecture alone. Resolve the
+cleanup failure and native dependency closure, and retain all corresponding
+source/build recipes and notices before distribution. A builder snapshot alone
+does not freeze its moving git dependencies; any source rebuild must also pin
+the complete recipe dependency graph. The QuickJS milestone can be reviewed and
+used independently while this media runtime gate remains open.
+
 ## Scope
 
 The requested ARM64 target uses a debrid service and HTTP media streams. Native
