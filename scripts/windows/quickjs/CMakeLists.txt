@@ -14,11 +14,22 @@ file(TO_CMAKE_PATH "$ENV{JAVA_HOME}" java_home)
 file(READ "${native}/quickjs/VERSION" version)
 string(STRIP "${version}" version)
 file(GLOB_RECURSE jni CONFIGURE_DEPENDS "${native}/jni/*.c")
+# MSVC-mode Clang 22 treats enum bitfields as signed. Values 4..7 of this
+# three-bit field then read back negative and abort when resolving globals.
+# Patch only a build copy; the pinned source checkout remains unmodified.
+file(READ "${native}/quickjs/quickjs.c" engine_source)
+set(closure_field "JSClosureTypeEnum closure_type : 3;")
+string(FIND "${engine_source}" "${closure_field}" closure_field_offset)
+if(closure_field_offset EQUAL -1)
+  message(FATAL_ERROR "Pinned QuickJS closure field changed; review the MSVC port")
+endif()
+string(REPLACE "${closure_field}" "unsigned int closure_type : 3;" engine_source "${engine_source}")
+file(WRITE "${CMAKE_CURRENT_BINARY_DIR}/quickjs-msvc.c" "${engine_source}")
 add_library(quickjs SHARED ${jni}
-  "${native}/quickjs/quickjs.c" "${native}/quickjs/cutils.c"
+  "${CMAKE_CURRENT_BINARY_DIR}/quickjs-msvc.c" "${native}/quickjs/cutils.c"
   "${native}/quickjs/dtoa.c" "${native}/quickjs/libregexp.c"
   "${native}/quickjs/libunicode.c" "${native}/common/quickjs_version.c"
-  "${native}/common/quickjs_interrupt.c" win32-compat.c wide-integer.c diagnose-abort.c)
+  "${native}/common/quickjs_interrupt.c" win32-compat.c wide-integer.c)
 set_target_properties(quickjs PROPERTIES PREFIX "lib" C_STANDARD 11
   MSVC_RUNTIME_LIBRARY "MultiThreaded")
 target_include_directories(quickjs PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}/include"
@@ -30,7 +41,7 @@ target_compile_definitions(quickjs PRIVATE CONFIG_WIN32 CONFIG_BIGNUM
 # Keep the engine's native 64-bit BigInt limbs. The small wide-integer helper
 # supplies Clang's unsigned division builtins absent from the MSVC runtime.
 # Match Bellard's Makefile: the engine requires wrapping signed arithmetic.
-target_compile_options(quickjs PRIVATE /clang:-std=gnu11 /clang:-fwrapv /FIstdlib.h /FImalloc.h "/FI${CMAKE_CURRENT_SOURCE_DIR}/diagnose-abort.h")
+target_compile_options(quickjs PRIVATE /clang:-std=gnu11 /clang:-fwrapv /FIstdlib.h /FImalloc.h)
 # JNIEXPORT supplies the public JNI symbols. Do not use the upstream .def,
 # which exports the generic C API for Kotlin/Native rather than the JNI ABI.
 target_link_options(quickjs PRIVATE /INCREMENTAL:NO /Brepro)

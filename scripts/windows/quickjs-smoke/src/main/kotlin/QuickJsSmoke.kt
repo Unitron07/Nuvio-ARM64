@@ -16,6 +16,8 @@ fun main() = runBlocking {
             QuickJs.create(Dispatchers.Default).use { js ->
                 println("Engine $it: created; evaluate begin")
                 check(js.evaluate<Long>("21 * 2") == 42L)
+                check(js.evaluate<String>("String(42)") == "42")
+                check(js.evaluate<Long>("(() => { let captured = 40; return (() => captured + 2)(); })()") == 42L)
                 println("Engine $it: evaluation passed")
                 check(js.evaluate<String>("String((2n ** 100n) / 3n)") == "422550200076076467165567735125")
                 println("Engine $it: BigInt passed")
