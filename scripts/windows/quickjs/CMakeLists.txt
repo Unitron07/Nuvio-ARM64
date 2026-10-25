@@ -41,3 +41,7 @@ target_compile_definitions(win32-compat-test PRIVATE WIN32_LEAN_AND_MEAN NOMINMA
 set_target_properties(win32-compat-test PROPERTIES MSVC_RUNTIME_LIBRARY "MultiThreaded")
 add_test(NAME win32-synchronization COMMAND win32-compat-test)
 set_tests_properties(win32-synchronization PROPERTIES TIMEOUT 15)
+add_executable(wide-integer-test wide-integer-test.c wide-integer.c)
+set_target_properties(wide-integer-test PROPERTIES MSVC_RUNTIME_LIBRARY "MultiThreaded")
+add_test(NAME wide-integer-division COMMAND wide-integer-test)
+set_tests_properties(wide-integer-division PROPERTIES TIMEOUT 15)
