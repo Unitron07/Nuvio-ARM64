@@ -17,6 +17,7 @@ function Invoke-Checked([string]$Program, [string[]]$Arguments) {
     if ($LASTEXITCODE -ne 0) { throw "$Program failed with exit code $LASTEXITCODE" }
 }
 $BuildRoot = [IO.Path]::GetFullPath($BuildRoot)
+New-Item -ItemType Directory -Force $BuildRoot | Out-Null
 $JavaHome = [IO.Path]::GetFullPath($JavaHome)
 if (-not (Test-Path "$JavaHome/include/win32/jni_md.h")) { throw 'A Windows JDK with JNI headers is required.' }
 $env:JAVA_HOME = $JavaHome
@@ -28,7 +29,10 @@ if (-not $VsDevCmd) {
 if (-not $VsDevCmd -or -not (Test-Path $VsDevCmd)) { throw 'VsDevCmd.bat was not found.' }
 # Import the target SDK/MSVC library environment for CMake and the linker.
 $hostArch = if ($env:PROCESSOR_ARCHITECTURE -eq 'ARM64') { 'arm64' } else { 'x64' }
-$environment = & cmd.exe /d /s /c "`"`"$VsDevCmd`" -no_logo -arch=$Architecture -host_arch=$hostArch >nul && set`""
+$environmentScript = Join-Path $BuildRoot "msvc-environment-$Architecture.cmd"
+@('@echo off', "call `"$VsDevCmd`" -no_logo -arch=$Architecture -host_arch=$hostArch >nul",
+  'if errorlevel 1 exit /b %errorlevel%', 'set') | Set-Content -LiteralPath $environmentScript -Encoding ASCII
+$environment = & cmd.exe /d /c "call `"$environmentScript`""
 if ($LASTEXITCODE -ne 0) { throw 'MSVC target environment initialization failed.' }
 foreach ($line in $environment) {
     if ($line -match '^([^=]+)=(.*)$') { [Environment]::SetEnvironmentVariable($Matches[1], $Matches[2], 'Process') }

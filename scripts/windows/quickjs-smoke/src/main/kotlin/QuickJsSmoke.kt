@@ -1,5 +1,7 @@
 import com.dokar.quickjs.QuickJs
 import com.dokar.quickjs.QuickJsException
+import com.dokar.quickjs.binding.asyncFunction
+import com.dokar.quickjs.binding.function
 import com.dokar.quickjs.evaluate
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
