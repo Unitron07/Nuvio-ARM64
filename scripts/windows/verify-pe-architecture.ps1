@@ -9,9 +9,9 @@ $expectedMachine = if ($Architecture -eq 'arm64') { 0xAA64 } else { 0x8664 }
 foreach ($entry in $Path) {
     if (-not (Test-Path -LiteralPath $entry)) { throw "Native input is missing: $entry" }
     $item = Get-Item -LiteralPath $entry
-    $files = if ($item.PSIsContainer) {
-        @(Get-ChildItem -LiteralPath $item.FullName -Filter '*.dll' -File -Recurse)
-    } else { @($item) }
+    $files = @(if ($item.PSIsContainer) {
+        Get-ChildItem -LiteralPath $item.FullName -Filter '*.dll' -File -Recurse
+    } else { $item })
     if ($files.Count -eq 0) { throw "No native DLLs found in $entry" }
 
     foreach ($file in $files) {

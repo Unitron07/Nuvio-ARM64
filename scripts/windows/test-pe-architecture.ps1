@@ -1,4 +1,5 @@
 $ErrorActionPreference = 'Stop'
+Set-StrictMode -Version Latest
 $verifier = Join-Path $PSScriptRoot 'verify-pe-architecture.ps1'
 $testRoot = Join-Path ([System.IO.Path]::GetTempPath()) ('nuvio-pe-' + [guid]::NewGuid())
 New-Item -ItemType Directory -Path $testRoot | Out-Null
