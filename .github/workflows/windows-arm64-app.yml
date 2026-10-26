@@ -34,12 +34,31 @@ jobs:
       - name: Exercise actual ARM64 lifecycle and unload
         shell: pwsh
         run: |
-          & "$env:JAVA_HOME/bin/java.exe" -Dmpv.cycles=30 `
+          & "$env:JAVA_HOME/bin/java.exe" '-Dmpv.cycles=30' `
             -cp scripts/windows/quickjs-smoke/build/jna/jna-5.19.1.jar `
             scripts/windows/MpvProbe.java build/windows-media-arm64/runtime/libmpv-2.dll `
             osc=no load-scripts=no load-stats-overlay=no load-console=no load-auto-profiles=no `
             ytdl=no load-select=no load-positioning=no load-commands=no load-context-menu=no d3d11-exclusive-fs=no
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+      - name: Decode and seek a generated video over HTTP
+        shell: pwsh
+        run: |
+          python scripts/windows/make-smoke-avi.py build/fixture.avi
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          & "$env:JAVA_HOME/bin/java.exe" -cp scripts/windows/quickjs-smoke/build/jna/jna-5.19.1.jar `
+            scripts/windows/MpvHttpSmoke.java build/windows-media-arm64/runtime/libmpv-2.dll build/fixture.avi
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+      - name: Verify portable native dependency closure
+        shell: pwsh
+        run: |
+          ./scripts/windows/verify-native-closure.ps1 -RuntimeDirectory build/windows-media-arm64/runtime
+          # A globally installed Vulkan loader must not hide a missing bundled one.
+          New-Item -ItemType Directory build/missing-loader-test | Out-Null
+          Copy-Item build/windows-media-arm64/runtime/libmpv-2.dll build/missing-loader-test/
+          $rejected=$false
+          try { ./scripts/windows/verify-native-closure.ps1 -RuntimeDirectory build/missing-loader-test }
+          catch { if ($_.Exception.Message -notmatch 'vulkan-1.dll') { throw }; $rejected=$true }
+          if (-not $rejected) { throw 'Missing Vulkan loader was incorrectly accepted.' }
       - name: Compile MSVC ARM64 bridge and create development app image
         id: image
         shell: pwsh
@@ -52,7 +71,7 @@ jobs:
             "-Pnuvio.webview2.dir=$pwd/build/windows-media-arm64/webview2" `
             "-Pnuvio.windows.libmpv.runtimeDir=$pwd/build/windows-media-arm64/runtime" `
             "-Pnuvio.windows.quickjs.dll=$pwd/build/windows-quickjs/arm64/libquickjs.dll" `
-            '-Dorg.gradle.jvmargs=-Xmx6g' -Pkotlin.compiler.execution.strategy=in-process `
+            '-Dorg.gradle.jvmargs=-Xmx6g' '-Pkotlin.compiler.execution.strategy=in-process' `
             --max-workers=2 --no-configuration-cache --no-daemon --console=plain
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
       - name: Record development artifact status
