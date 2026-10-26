@@ -771,7 +771,10 @@ val windowsCppRuntimeDllNames = listOf(
     "msvcp140_codecvt_ids.dll",
     "concrt140.dll",
 )
-val windowsCppRuntimeDlls = if (isWindowsHost) {
+// ARM64 bridge uses /MT and the supplied media runtime carries its own closure.
+// System32 on Windows ARM64 can contain x64 compatibility CRT DLLs; never
+// discover app-local ARM64 dependencies there. Preserve the legacy x64 staging.
+val windowsCppRuntimeDlls = if (isWindowsHost && windowsPlayerBridgeArch == "x64") {
     windowsCppRuntimeDllNames
         .map { File("C:/Windows/System32", it) }
         .filter(File::exists)
@@ -816,6 +819,7 @@ val windowsPlayerBridgeCommand = if (missingWindowsPlayerBridgeInputs.isNotEmpty
         "/EHsc",
         "/std:c++17",
         "/LD",
+        "/MT",
         "/DUNICODE",
         "/D_UNICODE",
         "/DNOMINMAX",

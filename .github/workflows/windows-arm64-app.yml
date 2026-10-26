@@ -78,7 +78,12 @@ jobs:
         id: audit
         shell: pwsh
         run: |
+          ./scripts/windows/test-image-audit.ps1
           ./scripts/windows/audit-arm64-image.ps1 -ImageDirectory composeApp/build/compose/binaries/main/app -PruneForeignJarNatives
+          New-Item -ItemType Directory -Force build/bridge-closure | Out-Null
+          Copy-Item composeApp/build/native/windows-runtime/arm64/*.dll build/bridge-closure/
+          Copy-Item composeApp/build/native/windows/arm64/player_bridge.dll build/bridge-closure/
+          ./scripts/windows/verify-native-closure.ps1 -RuntimeDirectory build/bridge-closure
       - name: Run packaged native prerequisite smoke
         id: startup
         shell: pwsh

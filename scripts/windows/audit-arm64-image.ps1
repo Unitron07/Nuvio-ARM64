@@ -15,7 +15,7 @@ function Machine([IO.Stream]$Stream, [long]$Length) {
     $head=$reader.ReadBytes(64)
     if ($head.Length -lt 64 -or [BitConverter]::ToUInt16($head,0) -ne 0x5A4D) { throw 'Invalid PE image.' }
     $offset=[BitConverter]::ToInt32($head,60)
-    if ($offset -lt 64 -or $offset -gt $Length-24) { throw 'Invalid PE offset.' }
+    if ($offset -lt 64 -or $offset -gt ($Length - 24)) { throw "Invalid PE offset $offset in $Length bytes." }
     [void]$reader.ReadBytes($offset-64)
     if ($reader.ReadUInt32() -ne 0x4550) { throw 'Invalid PE signature.' }
     return $reader.ReadUInt16()
@@ -33,8 +33,9 @@ foreach ($file in Get-ChildItem -LiteralPath $image -Recurse -File) {
         $archive=[IO.Compression.ZipFile]::Open($file.FullName,$mode)
         try {
             foreach ($entry in @($archive.Entries | Where-Object { $_.FullName -match '\.(dll|exe)$' })) {
+                $nativeLength=$entry.Length
                 $stream=$entry.Open()
-                try { $machine=Machine $stream $entry.Length } finally { $stream.Dispose() }
+                try { $machine=Machine $stream $nativeLength } finally { $stream.Dispose() }
                 if ($machine -ne 0xAA64) {
                     $name=$file.FullName.Substring($image.Length+1) + '!' + $entry.FullName
                     if (-not $PruneForeignJarNatives) { throw "Foreign JAR native resource: $name" }
