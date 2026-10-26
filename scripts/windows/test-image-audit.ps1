@@ -22,6 +22,19 @@ function Reject([scriptblock]$Action,[string]$Message) {
 try {
     $arm=Pe 0xaa64
     [IO.File]::WriteAllBytes("$root/launcher.exe",$arm)
+    $javaBin=if ($env:JAVA_HOME) { Join-Path $env:JAVA_HOME 'bin' } else { Split-Path (Get-Command javac -ErrorAction Stop).Source }
+    New-Item -ItemType Directory "$root/classes","$root/fixture/windows_x64" | Out-Null
+    'public class AuditFixture { public static void main(String[] args) { System.out.println("PASS: Java class loading after native audit"); } }' |
+        Set-Content "$root/AuditFixture.java"
+    & "$javaBin/javac.exe" -d "$root/classes" "$root/AuditFixture.java"
+    if ($LASTEXITCODE -ne 0) { throw 'Java regression fixture compilation failed.' }
+    & "$javaBin/jar.exe" --create --file "$root/plain.jar" -C "$root/classes" .
+    if ($LASTEXITCODE -ne 0) { throw 'Plain JAR fixture creation failed.' }
+    [IO.File]::WriteAllBytes("$root/fixture/windows_x64/lib.dll",(Pe 0x8664))
+    & "$javaBin/jar.exe" --create --file "$root/java-native.jar" -C "$root/classes" . -C "$root/fixture" .
+    if ($LASTEXITCODE -ne 0) { throw 'Native JAR fixture creation failed.' }
+    Remove-Item -LiteralPath "$root/fixture/windows_x64/lib.dll"
+    $plainHash=(Get-FileHash "$root/plain.jar" -Algorithm SHA256).Hash
     $jar=[IO.Compression.ZipFile]::Open("$root/runtime.jar",[IO.Compression.ZipArchiveMode]::Create)
     try {
         foreach ($entry in @(@('windows_aarch64/lib.dll',$arm),@('windows_x64/lib.dll',(Pe 0x8664)),@('Test.class',[byte[]](1,2,3)))) {
@@ -31,6 +44,11 @@ try {
     } finally { $jar.Dispose() }
     Reject { & "$PSScriptRoot/audit-arm64-image.ps1" -ImageDirectory $root } 'Foreign JAR native'
     & "$PSScriptRoot/audit-arm64-image.ps1" -ImageDirectory $root -PruneForeignJarNatives
+    if ((Get-FileHash "$root/plain.jar" -Algorithm SHA256).Hash -ne $plainHash) { throw 'Untouched JAR bytes changed.' }
+    foreach ($javaJar in @('plain.jar','java-native.jar')) {
+        & "$javaBin/java.exe" -cp "$root/$javaJar" AuditFixture
+        if ($LASTEXITCODE -ne 0) { throw "Java cannot load preserved classes: $javaJar" }
+    }
     $jar=[IO.Compression.ZipFile]::OpenRead("$root/runtime.jar")
     try {
         if ($jar.GetEntry('windows_x64/lib.dll')) { throw 'Foreign native retained.' }

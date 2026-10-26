@@ -23,6 +23,9 @@ internal fun runWindowsNativeStartupSmoke() = runBlocking {
         check(engine.evaluate<String>("String(21 * 2)") == "42")
     }
     println("PASS: packaged QuickJS JNI evaluation and disposal")
+    Class.forName("org.slf4j.LoggerFactory")
+    Class.forName("io.ktor.client.plugins.contentnegotiation.ContentNegotiationKt")
+    println("PASS: packaged SLF4J and Ktor content negotiation initialization")
     NativePlayerBridge.ensureLoaded()
     repeat(5) { println("PASS: ${NativePlayerBridge.verifyWindowsRuntime()}") }
     println("PASS: native prerequisite smoke (main UI/provider services are separate checks)")

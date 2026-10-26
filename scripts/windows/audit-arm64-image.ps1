@@ -29,8 +29,10 @@ foreach ($file in Get-ChildItem -LiteralPath $image -Recurse -File) {
         if ($machine -ne 0xAA64) { throw "Foreign native image $($file.FullName): 0x$($machine.ToString('X4'))" }
         $checked++
     } elseif ($file.Extension -eq '.jar') {
-        $mode=if ($PruneForeignJarNatives) { [IO.Compression.ZipArchiveMode]::Update } else { [IO.Compression.ZipArchiveMode]::Read }
-        $archive=[IO.Compression.ZipFile]::Open($file.FullName,$mode)
+        # Read-only inspection is essential: Update mode can rewrite untouched
+        # ZIP data descriptors in a form Java's class loader cannot read.
+        $foreign=[Collections.Generic.HashSet[string]]::new([StringComparer]::Ordinal)
+        $archive=[IO.Compression.ZipFile]::OpenRead($file.FullName)
         try {
             foreach ($entry in @($archive.Entries | Where-Object { $_.FullName -match '\.(dll|exe)$' })) {
                 $nativeLength=$entry.Length
@@ -40,10 +42,28 @@ foreach ($file in Get-ChildItem -LiteralPath $image -Recurse -File) {
                     $name=$file.FullName.Substring($image.Length+1) + '!' + $entry.FullName
                     if (-not $PruneForeignJarNatives) { throw "Foreign JAR native resource: $name" }
                     $removed.Add($name)
-                    $entry.Delete()
+                    [void]$foreign.Add($entry.FullName)
                 } else { $checked++ }
             }
         } finally { $archive.Dispose() }
+        if ($foreign.Count -gt 0) {
+            $temporary=$file.FullName + '.' + [guid]::NewGuid() + '.tmp'
+            $source=[IO.Compression.ZipFile]::OpenRead($file.FullName)
+            $target=[IO.Compression.ZipFile]::Open($temporary,[IO.Compression.ZipArchiveMode]::Create)
+            try {
+                foreach ($entry in $source.Entries) {
+                    if ($foreign.Contains($entry.FullName)) { continue }
+                    $copy=$target.CreateEntry($entry.FullName,[IO.Compression.CompressionLevel]::Optimal)
+                    $copy.LastWriteTime=$entry.LastWriteTime
+                    $copy.ExternalAttributes=$entry.ExternalAttributes
+                    $inputStream=$entry.Open()
+                    $outputStream=$copy.Open()
+                    try { $inputStream.CopyTo($outputStream) }
+                    finally { $outputStream.Dispose(); $inputStream.Dispose() }
+                }
+            } finally { $target.Dispose(); $source.Dispose() }
+            [IO.File]::Move($temporary,$file.FullName,$true)
+        }
     }
 }
 if ($checked -eq 0) { throw 'No native binaries were audited.' }
