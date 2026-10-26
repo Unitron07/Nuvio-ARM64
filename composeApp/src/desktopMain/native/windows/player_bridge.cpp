@@ -70,6 +70,19 @@ constexpr UINT kUiTaskTimeoutMs = 2000;
 constexpr UINT kShutdownJoinTimeoutMs = 3000;
 constexpr double kMaxVolumePercent = 200.0;
 
+#if defined(_M_ARM64)
+// Opt-in development diagnostics; never handles or suppresses an exception.
+void traceArm64Player(const char *phase) {
+    wchar_t enabled[2] = {};
+    if (GetEnvironmentVariableW(L"NUVIO_ARM64_PLAYER_TRACE", enabled, 2) == 0) return;
+    std::fprintf(stderr, "[arm64-player] tid=%lu inSend=0x%lx %s\n",
+                 GetCurrentThreadId(), InSendMessageEx(nullptr), phase);
+    std::fflush(stderr);
+}
+#else
+void traceArm64Player(const char *) {}
+#endif
+
 const wchar_t *kMessageWindowClass = L"NuvioPlayerBridgeMessageWindow";
 const wchar_t *kContainerWindowClass = L"NuvioPlayerBridgeContainerWindow";
 constexpr DWORD kDwmwaUseImmersiveDarkMode = 20;
@@ -1044,8 +1057,11 @@ public:
 
     void onTimer() {
         if (shuttingDown.load()) return;
+        traceArm64Player("timer layout begin");
         layoutNativeSubviews();
+        traceArm64Player("timer controls begin");
         syncControls();
+        traceArm64Player("timer complete");
     }
 
     void updateControlsJson(const std::string &controlsJson) {
@@ -1653,6 +1669,7 @@ private:
     }
 
     void startWebView(const std::string &controlsUrl) {
+        traceArm64Player("environment create begin");
         std::wstring userDataDir = webViewUserDataDirectory();
         auto weakSelf = weak_from_this();
         HRESULT result = CreateCoreWebView2EnvironmentWithOptions(
@@ -1661,6 +1678,7 @@ private:
             nullptr,
             Callback<ICoreWebView2CreateCoreWebView2EnvironmentCompletedHandler>(
                 [weakSelf, controlsUrl](HRESULT envResult, ICoreWebView2Environment *createdEnvironment) -> HRESULT {
+                    traceArm64Player("environment callback begin");
                     auto self = weakSelf.lock();
                     if (!self || self->shuttingDown.load()) return S_OK;
                     if (FAILED(envResult) || !createdEnvironment) {
@@ -1668,10 +1686,12 @@ private:
                     }
                     self->environment = createdEnvironment;
                     auto controllerWeakSelf = weakSelf;
+                    traceArm64Player("controller create begin");
                     HRESULT controllerResult = createdEnvironment->CreateCoreWebView2Controller(
                         self->containerHwnd,
                         Callback<ICoreWebView2CreateCoreWebView2ControllerCompletedHandler>(
                             [controllerWeakSelf, controlsUrl](HRESULT controllerResult, ICoreWebView2Controller *createdController) -> HRESULT {
+                                traceArm64Player("controller callback begin");
                                 auto controllerSelf = controllerWeakSelf.lock();
                                 if (!controllerSelf || controllerSelf->shuttingDown.load()) return S_OK;
                                 if (FAILED(controllerResult) || !createdController) {
@@ -1679,6 +1699,7 @@ private:
                                 }
                                 controllerSelf->controller = createdController;
                                 createdController->get_CoreWebView2(&controllerSelf->webView);
+                                traceArm64Player("controller webview obtained");
 
                                 ComPtr<ICoreWebView2Controller2> controller2;
                                 if (SUCCEEDED(createdController->QueryInterface(IID_PPV_ARGS(&controller2))) && controller2) {
@@ -1724,32 +1745,53 @@ private:
                                     controllerSelf->webView->add_WebMessageReceived(
                                         Callback<ICoreWebView2WebMessageReceivedEventHandler>(
                                             [messageWeakSelf](ICoreWebView2 *, ICoreWebView2WebMessageReceivedEventArgs *args) -> HRESULT {
+                                                traceArm64Player("web message callback begin");
                                                 auto messageSelf = messageWeakSelf.lock();
                                                 if (!messageSelf || messageSelf->shuttingDown.load() || !args) return S_OK;
                                                 PWSTR messageJson = nullptr;
                                                 if (SUCCEEDED(args->get_WebMessageAsJson(&messageJson)) && messageJson) {
-                                                    messageSelf->handleWebMessage(std::wstring(messageJson));
+                                                    std::wstring message(messageJson);
                                                     CoTaskMemFree(messageJson);
+#if defined(_M_ARM64)
+                                                    // WebView2 callbacks can arrive during an input-synchronous
+                                                    // COM call. Defer handlers that may call back into WebView2.
+                                                    messageSelf->postUiTask([messageWeakSelf, message = std::move(message)]() {
+                                                        auto target = messageWeakSelf.lock();
+                                                        if (!target || target->shuttingDown.load()) return;
+                                                        traceArm64Player("posted web message begin");
+                                                        target->handleWebMessage(message);
+                                                        traceArm64Player("posted web message complete");
+                                                    });
+#else
+                                                    messageSelf->handleWebMessage(message);
+#endif
                                                 }
+                                                traceArm64Player("web message callback complete");
                                                 return S_OK;
                                             }
                                         ).Get(),
                                         &controllerSelf->messageToken
                                     );
+                                    traceArm64Player("controller layout begin");
                                     controllerSelf->layoutNativeSubviews();
                                     std::wstring url = toWide(controlsUrl);
+                                    traceArm64Player("controller navigate begin");
                                     controllerSelf->webView->Navigate(url.c_str());
+                                    traceArm64Player("controller focus begin");
                                     createdController->MoveFocus(COREWEBVIEW2_MOVE_FOCUS_REASON_PROGRAMMATIC);
+                                    traceArm64Player("controller callback complete");
                                 }
                                 return S_OK;
                             }
                         ).Get()
                     );
                     (void)controllerResult;
+                    traceArm64Player("controller create returned");
                     return S_OK;
                 }
             ).Get()
         );
+        traceArm64Player("environment create returned");
         if (FAILED(result)) {
             throw std::runtime_error(hresultMessage("CreateCoreWebView2EnvironmentWithOptions", result));
         }
