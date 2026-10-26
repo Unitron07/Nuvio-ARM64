@@ -49,6 +49,9 @@ internal object NativePlayerBridge {
      */
     external fun initGtkEarly(): Boolean
 
+    /** Used only by the opt-in packaged Windows runtime smoke command. */
+    external fun verifyWindowsRuntime(): String
+
     external fun create(
         hostViewPtr: Long,
         sourceUrl: String,

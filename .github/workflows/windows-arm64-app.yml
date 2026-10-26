@@ -74,11 +74,28 @@ jobs:
             '-Dorg.gradle.jvmargs=-Xmx6g' '-Pkotlin.compiler.execution.strategy=in-process' `
             --max-workers=2 --no-configuration-cache --no-daemon --console=plain
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+      - name: Audit native architectures in the development image
+        id: audit
+        shell: pwsh
+        run: |
+          ./scripts/windows/audit-arm64-image.ps1 -ImageDirectory composeApp/build/compose/binaries/main/app -PruneForeignJarNatives
+      - name: Run packaged native prerequisite smoke
+        id: startup
+        shell: pwsh
+        run: |
+          $image=Get-ChildItem composeApp/build/compose/binaries/main/app -Directory | Select-Object -First 1
+          $launcher=Get-ChildItem $image.FullName -File -Filter '*.exe' | Select-Object -First 1
+          # Isolated process configuration; no provider tokens or user profiles.
+          $env:APPDATA="$env:RUNNER_TEMP/nuvio-smoke/appdata"
+          $env:LOCALAPPDATA="$env:RUNNER_TEMP/nuvio-smoke/localappdata"
+          New-Item -ItemType Directory -Force $env:APPDATA,$env:LOCALAPPDATA | Out-Null
+          & $launcher.FullName --native-runtime-smoke
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
       - name: Record development artifact status
         if: always()
         shell: pwsh
         run: |
-          @('IMAGE_BUILD=${{ steps.image.outcome }}', 'SOURCE=${{ github.event.pull_request.head.sha || github.sha }}',
+          @('IMAGE_BUILD=${{ steps.image.outcome }}', 'IMAGE_NATIVE_AUDIT=${{ steps.audit.outcome }}', 'NATIVE_STARTUP=${{ steps.startup.outcome }}', 'SOURCE=${{ github.event.pull_request.head.sha || github.sha }}',
             'Development evidence only. Runtime launch, playback, licensing and install validation are separate gates.') |
             Set-Content build/ARM64_VALIDATION_STATUS.txt
       - uses: actions/upload-artifact@v6

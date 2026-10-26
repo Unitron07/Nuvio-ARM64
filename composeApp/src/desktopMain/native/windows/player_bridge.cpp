@@ -566,28 +566,54 @@ struct MpvApi {
         DWORD envCapacity = (DWORD)(sizeof(envPath) / sizeof(envPath[0]));
         DWORD envLength = GetEnvironmentVariableW(L"NUVIO_LIBMPV_PATH", envPath, envCapacity);
         if (envLength > 0 && envLength < envCapacity) {
+#if defined(_M_ARM64)
+            std::wstring overridePath(envPath, envPath + envLength);
+            bool absolute = (overridePath.size() > 2 && overridePath[1] == L':' &&
+                (overridePath[2] == L'\\' || overridePath[2] == L'/')) ||
+                overridePath.rfind(L"\\\\", 0) == 0;
+            if (!absolute) {
+                loadFailure = "NUVIO_LIBMPV_PATH must be an absolute ARM64 DLL path.";
+                return;
+            }
+#endif
             candidates.emplace_back(envPath, envPath + envLength);
         }
 
         std::wstring moduleDir = moduleDirectory();
-        if (!moduleDir.empty()) {
+        if (!moduleDir.empty()
+#if defined(_M_ARM64)
+            && candidates.empty()
+#endif
+        ) {
             candidates.push_back(moduleDir + L"\\libmpv-2.dll");
         }
+#if !defined(_M_ARM64)
         candidates.push_back(L"libmpv-2.dll");
         candidates.push_back(L"C:\\Program Files (x86)\\Nuvio\\app\\native\\libmpv-2.dll");
         candidates.push_back(L"C:\\msys64\\ucrt64\\bin\\libmpv-2.dll");
+#endif
 
+        DWORD lastLoadError = ERROR_MOD_NOT_FOUND;
         for (const std::wstring &candidate : candidates) {
+#if defined(_M_ARM64)
+            library = LoadLibraryExW(candidate.c_str(), nullptr,
+                LOAD_LIBRARY_SEARCH_DLL_LOAD_DIR | LOAD_LIBRARY_SEARCH_SYSTEM32);
+#else
             if (candidate.find(L'\\') != std::wstring::npos || candidate.find(L'/') != std::wstring::npos) {
                 library = LoadLibraryExW(candidate.c_str(), nullptr, LOAD_WITH_ALTERED_SEARCH_PATH);
             } else {
                 library = LoadLibraryW(candidate.c_str());
             }
+#endif
             if (library) break;
+            lastLoadError = GetLastError();
         }
 
         if (!library) {
             loadFailure = "Unable to load libmpv-2.dll. Bundle it under native/windows or set NUVIO_LIBMPV_PATH.";
+#if defined(_M_ARM64)
+            loadFailure += " ARM64 and its bundled dependency closure are required; Win32 error " + std::to_string(lastLoadError) + ".";
+#endif
             return;
         }
 
@@ -623,6 +649,23 @@ MpvApi &mpvApi() {
     static MpvApi api;
     api.ensureLoaded();
     return api;
+}
+
+void configureArm64EmbeddedMpv(MpvApi &api, mpv_handle *handle) {
+#if defined(_M_ARM64)
+    // Nuvio supplies controls and HTTP source resolution; QuickJS plugins are
+    // independent. Avoid LuaJIT built-in script threads in the ARM64 JVM.
+    for (const char *option : {"osc", "load-scripts", "load-stats-overlay",
+            "load-console", "load-auto-profiles", "ytdl", "load-select",
+            "load-positioning", "load-commands", "load-context-menu",
+            "d3d11-exclusive-fs"}) {
+        if (api.setOptionString(handle, option, "no") < 0) {
+            throw std::runtime_error(std::string("ARM64 embedded mpv option is unavailable: ") + option);
+        }
+    }
+#else
+    (void)api; (void)handle;
+#endif
 }
 
 class WindowsMpvWebPlayer;
@@ -1724,20 +1767,7 @@ private:
 
             setMpvOptionStringLocked("config", "no");
             setMpvOptionStringLocked("osc", "no");
-#if defined(_M_ARM64)
-            // Nuvio supplies its own controls and resolves HTTP sources itself.
-            // LuaJIT's built-in script threads can raise 0xe24c4a02 during
-            // destruction inside an ARM64 JVM. Avoid starting those threads;
-            // retain normal terminate_destroy and the x64 configuration.
-            for (const char *option : {"load-scripts", "load-stats-overlay",
-                    "load-console", "load-auto-profiles", "ytdl", "load-select",
-                    "load-positioning", "load-commands", "load-context-menu",
-                    "d3d11-exclusive-fs"}) {
-                if (api.setOptionString(mpv, option, "no") < 0) {
-                    throw std::runtime_error(std::string("ARM64 embedded mpv option is unavailable: ") + option);
-                }
-            }
-#endif
+            configureArm64EmbeddedMpv(api, mpv);
             setMpvOptionStringLocked("input-default-bindings", "yes");
             setMpvOptionStringLocked("input-vo-keyboard", "no");
             setMpvOptionStringLocked("keep-open", "yes");
@@ -2389,6 +2419,34 @@ BOOL APIENTRY DllMain(HMODULE module, DWORD reason, LPVOID) {
         DisableThreadLibraryCalls(module);
     }
     return TRUE;
+}
+
+extern "C" JNIEXPORT jstring JNICALL
+Java_com_nuvio_app_features_player_desktop_NativePlayerBridge_verifyWindowsRuntime(JNIEnv *env, jobject) {
+    try {
+        MpvApi &api = mpvApi();
+        auto destroy = [&api](mpv_handle *handle) { api.terminateDestroy(handle); };
+        std::unique_ptr<mpv_handle, decltype(destroy)> handle(api.create(), destroy);
+        if (!handle) throw std::runtime_error("mpv_create failed.");
+        for (const auto &option : {std::pair<const char *, const char *>("config", "no"),
+                {"vo", "null"}, {"ao", "null"}, {"terminal", "no"}}) {
+            if (api.setOptionString(handle.get(), option.first, option.second) < 0)
+                throw std::runtime_error("mpv smoke option failed.");
+        }
+        configureArm64EmbeddedMpv(api, handle.get());
+        int result = api.initialize(handle.get());
+        if (result < 0) throw std::runtime_error("mpv_initialize: " + api.errorText(result));
+        char *version = nullptr;
+        result = api.getProperty(handle.get(), "mpv-version", MPV_FORMAT_STRING, &version);
+        if (result < 0 || !version) throw std::runtime_error("mpv-version query failed.");
+        std::string message(version);
+        api.freeValue(version);
+        handle.reset(); // Actual teardown must finish before reporting success.
+        return env->NewStringUTF((message + "; initialized and destroyed through JNI").c_str());
+    } catch (const std::exception &error) {
+        throwJavaError(env, error.what());
+        return nullptr;
+    }
 }
 
 extern "C" JNIEXPORT jlong JNICALL
