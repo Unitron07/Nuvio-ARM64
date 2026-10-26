@@ -224,13 +224,29 @@ fun main(args: Array<String>) {
             } else {
                 // The player surface reads LocalNuvioPlatformDensity, which only
                 // NuvioTheme provides — the bare smoke harness must supply it too.
+                val smokeReporting = System.getenv("NUVIO_DESKTOP_SMOKE_REPORT") == "1"
+                val lastSmokeProgress = remember { longArrayOf(-1, -1, -1) }
                 NuvioTheme {
                     PlatformPlayerSurface(
                         sourceUrl = smokePlayerUrl,
                         modifier = Modifier.fillMaxSize(),
                         onControllerReady = {},
-                        onSnapshot = {},
-                        onError = {},
+                        onSnapshot = { snapshot ->
+                            if (smokeReporting) {
+                                val second = snapshot.positionMs / 1000
+                                val dimensions = (snapshot.videoWidth.toLong() shl 32) or snapshot.videoHeight.toLong()
+                                if (lastSmokeProgress[0] != second || lastSmokeProgress[1] != snapshot.durationMs ||
+                                    lastSmokeProgress[2] != dimensions
+                                ) {
+                                    lastSmokeProgress[0] = second
+                                    lastSmokeProgress[1] = snapshot.durationMs
+                                    lastSmokeProgress[2] = dimensions
+                                    println("PLAYER_SMOKE positionMs=${snapshot.positionMs} durationMs=${snapshot.durationMs} " +
+                                        "video=${snapshot.videoWidth}x${snapshot.videoHeight} playing=${snapshot.isPlaying} ended=${snapshot.isEnded}")
+                                }
+                            }
+                        },
+                        onError = { if (smokeReporting) System.err.println("PLAYER_SMOKE error") },
                     )
                 }
             }
