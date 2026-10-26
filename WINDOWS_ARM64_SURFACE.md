@@ -1,9 +1,10 @@
 # Windows ARM64 and Surface Pro 11
 
-Status: native Windows ARM64 QuickJS JNI built and smoke-tested;
-**not a working ARM64 application or installer yet**.
+Status: native Windows ARM64 bridge and development application image built;
+packaged native prerequisite smoke passed. Full UI/playback and installer
+validation remain separate gates.
 Baseline: [NuvioMedia/NuvioDesktop Dev](https://github.com/NuvioMedia/NuvioDesktop/tree/5e18596aa919a6a4e7b6cdee7f90dfaabbf71b00), commit `5e18596aa919a6a4e7b6cdee7f90dfaabbf71b00`.
-Inspection: October 24–25, 2026.
+Inspection: October 24–26, 2026.
 
 ## Stage 2: QuickJS JNI source build
 
@@ -199,6 +200,17 @@ static dependency license/notices and corresponding-source audit remains a
 distribution gate; the archived builder revision alone does not pin its entire
 moving dependency graph. Full UI, GPU playback, Surface input, x64 application
 regression and install/update validation remain separate gates.
+
+[Native image run 40379364086](https://github.com/Unitron07/Nuvio-ARM64/actions/runs/40379364086)
+passes at source commit `a15e3e2da09fe2c54d17b9e54f96e59c063e2d3b`.
+MSVC compiles `player_bridge.dll` for ARM64; its imports are WebView2Loader and
+Windows OS libraries, with no dynamic C++ CRT dependency. Gradle produces the
+development app image in 6m50s. The image audit verifies 34 ARM64 native files
+and resources, removing five foreign Windows native resources from built-image
+JARs. Its actual launcher reports ARM64 JDK 21.0.11, successful JNA/Skiko raster
+initialization, packaged QuickJS evaluation/disposal, and all five JNI libmpv
+initialization/destruction cycles. This is the first verified development image,
+not an installer or proof of full UI/GPU/provider playback.
 
 ## Scope
 
