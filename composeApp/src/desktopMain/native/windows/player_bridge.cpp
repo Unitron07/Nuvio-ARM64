@@ -2394,8 +2394,18 @@ LRESULT CALLBACK containerWindowProc(HWND hwnd, UINT message, WPARAM wParam, LPA
             LONG w = LOWORD(lParam);
             LONG h = HIWORD(lParam);
             if (player && player->controller && w > 0 && h > 0) {
+#if defined(_M_ARM64)
+                // WM_SIZE may itself be delivered synchronously from AWT's
+                // host thread. Defer outgoing COM calls until posted dispatch.
+                player->postUiTask([self = player->shared_from_this(), w, h]() {
+                    if (self->shuttingDown.load() || !self->controller) return;
+                    RECT webBounds = {0, 0, w, h};
+                    self->controller->put_Bounds(webBounds);
+                });
+#else
                 RECT webBounds = {0, 0, w, h};
                 player->controller->put_Bounds(webBounds);
+#endif
             }
             return 0;
         }
