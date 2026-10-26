@@ -94,8 +94,16 @@ jobs:
           $env:APPDATA="$env:RUNNER_TEMP/nuvio-smoke/appdata"
           $env:LOCALAPPDATA="$env:RUNNER_TEMP/nuvio-smoke/localappdata"
           New-Item -ItemType Directory -Force $env:APPDATA,$env:LOCALAPPDATA | Out-Null
-          & $launcher.FullName --native-runtime-smoke
-          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          $process=Start-Process -FilePath $launcher.FullName -ArgumentList '--native-runtime-smoke' `
+            -WindowStyle Hidden -PassThru -RedirectStandardOutput "$pwd/build/packaged-smoke.log" `
+            -RedirectStandardError "$pwd/build/packaged-smoke-error.log"
+          if (-not $process.WaitForExit(180000)) { $process.Kill(); throw 'Packaged native smoke timed out.' }
+          Get-Content build/packaged-smoke.log
+          Get-Content build/packaged-smoke-error.log
+          if ($process.ExitCode -ne 0) { throw "Packaged native smoke failed: $($process.ExitCode)" }
+          if ((Get-Content build/packaged-smoke.log -Raw) -notmatch 'PASS: native prerequisite smoke') {
+            throw 'Launcher did not report completed native prerequisite smoke.'
+          }
       - name: Record development artifact status
         if: always()
         shell: pwsh
@@ -109,6 +117,7 @@ jobs:
           name: windows-arm64-development-evidence
           path: |
             build/ARM64_VALIDATION_STATUS.txt
+            build/packaged-smoke*.log
             composeApp/build/native/windows/arm64/
             build/windows-media-arm64/runtime/
             build/windows-media-arm64/provenance.json

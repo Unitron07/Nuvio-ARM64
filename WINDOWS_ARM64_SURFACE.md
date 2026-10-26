@@ -95,7 +95,7 @@ than all plugin services or the full application. The original x64 application
 release pipeline and touch implementation are unchanged; full x64 app, provider,
 playback and input regression runs were not repeated for this tooling milestone.
 
-### libmpv candidate investigation (not accepted for staging)
+### Initial libmpv candidate investigation (historical failure)
 
 The mpv.io-linked shinchiro builder publishes an actual ARM64 libmpv. The inspected
 candidate is [20261021 mpv-dev-aarch64](https://github.com/shinchiro/mpv-winbuild-cmake/releases/tag/20261021),
@@ -141,6 +141,64 @@ source/build recipes and notices before distribution. A builder snapshot alone
 does not freeze its moving git dependencies; any source rebuild must also pin
 the complete recipe dependency graph. The QuickJS milestone can be reviewed and
 used independently while this media runtime gate remains open.
+
+### Media runtime continuation: October 26, 2026
+
+PR #2 was merged externally after the QuickJS handoff. This continuation starts
+from verified `main` commit `29ed3b71216a86c18fb21e180b7ef92dd7e4fbef` and is
+tracked in [draft PR #3](https://github.com/Unitron07/Nuvio-ARM64/pull/3).
+The initial candidate observations above are historical; the following tests
+resolve the cleanup and missing-loader gates for development staging.
+
+The native exception `0xe24c4a02` is consistent with
+[LuaJIT's Windows exception propagation](https://github.com/LuaJIT/LuaJIT/blob/v2.1/src/lj_err.c)
+and the [builder's embedding report](https://github.com/shinchiro/mpv-winbuild-cmake/issues/811).
+The default-script baseline is intermittent: a 30-cycle test reproduced the
+crash after its first destruction. The ARM64 embedding preset disables `osc`,
+`load-scripts`, `load-stats-overlay`, `load-console`, `load-auto-profiles`,
+`ytdl`, `load-select`, `load-positioning`, `load-commands` and `load-context-menu`
+before initialization, and disables exclusive fullscreen. Nuvio supplies its own
+controls and source resolution. QuickJS plugin execution remains separate.
+The x64 mpv options are unchanged. Normal `mpv_terminate_destroy` and library
+unloading remain in place; the fix does not suppress native exceptions or skip
+cleanup. This preset passes 30 initialization/destruction cycles and final DLL
+unload on this Surface and native ARM64 CI. It establishes a tested mitigation
+for this pinned runtime, not a general LuaJIT ARM64 fix.
+
+`build-media-runtime.ps1` verifies the candidate archive hash above and builds
+Khronos Vulkan-Loader v1.4.328 from commit
+`f703f919c30c5b67958d35d40a4297cb3823ed78`, using Vulkan-Headers
+`9a0f3099c8a9607a7c0f3127d8abfdc19a93e8c5`, MSVC ARM64 and ARM64 assembly.
+It bundles `vulkan-1.dll` beside libmpv, with notices and file/source hashes.
+WebView2 SDK 1.0.4078.44 is hash pinned and its ARM64 loader is verified.
+`verify-native-closure.ps1` rejects unbundled non-system imports; a negative test
+proves a globally installed Vulkan loader cannot hide a missing bundled loader.
+The ARM64 bridge uses an absolute colocated DLL path and restricted DLL search.
+ARM64 staging does not copy compatibility CRTs from System32, where an ARM64
+host may contain AMD64 binaries. The bridge explicitly uses the static CRT.
+
+The generated 64x36, two-second AVI fixture passes loopback HTTP loading, decoded
+video-property checks, seeking, EOF, destruction and unloading locally and in
+native CI. The probe deliberately uses null video/audio outputs and software
+decoding. This does not validate D3D11 hardware decoding, audible output,
+subtitles, WebView2 controls, provider authentication or real debrid streams.
+
+The development workflow builds the player bridge and app image, audits native
+PE architecture (including JAR resources), and runs `--native-runtime-smoke`
+with isolated process configuration. This opt-in mode checks packaged JVM,
+JNA, Skiko raster initialization, QuickJS evaluation/disposal and five actual
+JNI bridge/libmpv creation/destruction cycles before normal UI/services start.
+Read `ARM64_VALIDATION_STATUS.txt` in each artifact: a retained failed run is
+diagnostic evidence, not a validated app. Foreign Windows native resources are
+removed only from dependency JAR copies in the built ARM64 image; classes and
+ARM64 resources are preserved. The audit refuses foreign standalone PE files.
+
+Temporary Actions artifacts have seven-day retention and are development
+evidence only. No release or installer is published. The pinned binary's full
+static dependency license/notices and corresponding-source audit remains a
+distribution gate; the archived builder revision alone does not pin its entire
+moving dependency graph. Full UI, GPU playback, Surface input, x64 application
+regression and install/update validation remain separate gates.
 
 ## Scope
 
