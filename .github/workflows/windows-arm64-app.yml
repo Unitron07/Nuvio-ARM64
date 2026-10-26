@@ -1,0 +1,77 @@
+name: Windows ARM64 development image
+on:
+  pull_request:
+    paths:
+      - scripts/windows/**
+      - composeApp/build.gradle.kts
+      - composeApp/src/desktopMain/**
+      - .github/workflows/windows-arm64-app.yml
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  native-image:
+    runs-on: windows-11-arm
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-java@v5
+        with:
+          distribution: microsoft
+          java-version: '21'
+          architecture: aarch64
+      - name: Build verified QuickJS JNI
+        shell: pwsh
+        run: ./scripts/windows/build-quickjs.ps1
+      - name: Acquire pinned media and build ARM64 Vulkan loader
+        shell: pwsh
+        run: ./scripts/windows/build-media-runtime.ps1
+      - name: Resolve standalone JNA for native lifecycle probe
+        shell: pwsh
+        run: |
+          ./gradlew.bat -p scripts/windows/quickjs-smoke copyJna --no-daemon --console=plain
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+      - name: Exercise actual ARM64 lifecycle and unload
+        shell: pwsh
+        run: |
+          & "$env:JAVA_HOME/bin/java.exe" -Dmpv.cycles=30 `
+            -cp scripts/windows/quickjs-smoke/build/jna/jna-5.19.1.jar `
+            scripts/windows/MpvProbe.java build/windows-media-arm64/runtime/libmpv-2.dll `
+            osc=no load-scripts=no load-stats-overlay=no load-console=no load-auto-profiles=no `
+            ytdl=no load-select=no load-positioning=no load-commands=no load-context-menu=no d3d11-exclusive-fs=no
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+      - name: Compile MSVC ARM64 bridge and create development app image
+        id: image
+        shell: pwsh
+        run: |
+          New-Item -ItemType File -Force local.properties | Out-Null
+          $vswhere = "${env:ProgramFiles(x86)}/Microsoft Visual Studio/Installer/vswhere.exe"
+          $vcvars = & $vswhere -latest -products '*' -find 'VC/Auxiliary/Build/vcvarsarm64.bat' | Select-Object -First 1
+          ./gradlew.bat :composeApp:createDistributable `
+            "-Pnuvio.windows.vcvars.path=$vcvars" `
+            "-Pnuvio.webview2.dir=$pwd/build/windows-media-arm64/webview2" `
+            "-Pnuvio.windows.libmpv.runtimeDir=$pwd/build/windows-media-arm64/runtime" `
+            "-Pnuvio.windows.quickjs.dll=$pwd/build/windows-quickjs/arm64/libquickjs.dll" `
+            '-Dorg.gradle.jvmargs=-Xmx6g' -Pkotlin.compiler.execution.strategy=in-process `
+            --max-workers=2 --no-configuration-cache --no-daemon --console=plain
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+      - name: Record development artifact status
+        if: always()
+        shell: pwsh
+        run: |
+          @('IMAGE_BUILD=${{ steps.image.outcome }}', 'SOURCE=${{ github.event.pull_request.head.sha || github.sha }}',
+            'Development evidence only. Runtime launch, playback, licensing and install validation are separate gates.') |
+            Set-Content build/ARM64_VALIDATION_STATUS.txt
+      - uses: actions/upload-artifact@v6
+        if: always()
+        with:
+          name: windows-arm64-development-evidence
+          path: |
+            build/ARM64_VALIDATION_STATUS.txt
+            composeApp/build/native/windows/arm64/
+            build/windows-media-arm64/runtime/
+            build/windows-media-arm64/provenance.json
+            build/windows-media-arm64/notices/
+            composeApp/build/compose/binaries/main/app/
+          if-no-files-found: warn
+          retention-days: 7

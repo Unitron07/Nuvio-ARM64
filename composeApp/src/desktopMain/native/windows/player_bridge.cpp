@@ -1724,6 +1724,20 @@ private:
 
             setMpvOptionStringLocked("config", "no");
             setMpvOptionStringLocked("osc", "no");
+#if defined(_M_ARM64)
+            // Nuvio supplies its own controls and resolves HTTP sources itself.
+            // LuaJIT's built-in script threads can raise 0xe24c4a02 during
+            // destruction inside an ARM64 JVM. Avoid starting those threads;
+            // retain normal terminate_destroy and the x64 configuration.
+            for (const char *option : {"load-scripts", "load-stats-overlay",
+                    "load-console", "load-auto-profiles", "ytdl", "load-select",
+                    "load-positioning", "load-commands", "load-context-menu",
+                    "d3d11-exclusive-fs"}) {
+                if (api.setOptionString(mpv, option, "no") < 0) {
+                    throw std::runtime_error(std::string("ARM64 embedded mpv option is unavailable: ") + option);
+                }
+            }
+#endif
             setMpvOptionStringLocked("input-default-bindings", "yes");
             setMpvOptionStringLocked("input-vo-keyboard", "no");
             setMpvOptionStringLocked("keep-open", "yes");
