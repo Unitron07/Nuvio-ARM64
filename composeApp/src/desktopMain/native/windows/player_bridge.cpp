@@ -72,6 +72,30 @@ constexpr double kMaxVolumePercent = 200.0;
 
 #if defined(_M_ARM64)
 // Opt-in development diagnostics; never handles or suppresses an exception.
+LONG CALLBACK traceComException(EXCEPTION_POINTERS *exception) {
+    static volatile LONG reported = 0;
+    if (!exception || exception->ExceptionRecord->ExceptionCode != 0x8001010d ||
+        InterlockedCompareExchange(&reported, 1, 0) != 0) return EXCEPTION_CONTINUE_SEARCH;
+    void *frames[48] = {};
+    USHORT count = CaptureStackBackTrace(0, 48, frames, nullptr);
+    std::fprintf(stderr, "[arm64-player] first COM 0x8001010d tid=%lu frames=%u\n", GetCurrentThreadId(), count);
+    for (USHORT i = 0; i < count; ++i) {
+        HMODULE module = nullptr;
+        if (GetModuleHandleExW(GET_MODULE_HANDLE_EX_FLAG_FROM_ADDRESS | GET_MODULE_HANDLE_EX_FLAG_UNCHANGED_REFCOUNT,
+                               reinterpret_cast<LPCWSTR>(frames[i]), &module)) {
+            wchar_t name[MAX_PATH] = {};
+            GetModuleFileNameW(module, name, MAX_PATH);
+            const wchar_t *baseName = wcsrchr(name, L'\\');
+            std::fprintf(stderr, "[arm64-player] frame %u %ls+0x%llx\n", i, baseName ? baseName + 1 : name,
+                         static_cast<unsigned long long>(reinterpret_cast<uintptr_t>(frames[i]) - reinterpret_cast<uintptr_t>(module)));
+        } else {
+            std::fprintf(stderr, "[arm64-player] frame %u %p\n", i, frames[i]);
+        }
+    }
+    std::fflush(stderr);
+    return EXCEPTION_CONTINUE_SEARCH;
+}
+
 void traceArm64Player(const char *phase) {
     wchar_t enabled[2] = {};
     if (GetEnvironmentVariableW(L"NUVIO_ARM64_PLAYER_TRACE", enabled, 2) == 0) return;
@@ -79,8 +103,16 @@ void traceArm64Player(const char *phase) {
                  GetCurrentThreadId(), InSendMessageEx(nullptr), phase);
     std::fflush(stderr);
 }
+
+void enableArm64ComTrace() {
+    wchar_t enabled[2] = {};
+    if (GetEnvironmentVariableW(L"NUVIO_ARM64_PLAYER_TRACE", enabled, 2) == 0) return;
+    static std::once_flag once;
+    std::call_once(once, []() { AddVectoredExceptionHandler(1, traceComException); });
+}
 #else
 void traceArm64Player(const char *) {}
+void enableArm64ComTrace() {}
 #endif
 
 const wchar_t *kMessageWindowClass = L"NuvioPlayerBridgeMessageWindow";
@@ -1669,6 +1701,7 @@ private:
     }
 
     void startWebView(const std::string &controlsUrl) {
+        enableArm64ComTrace();
         traceArm64Player("environment create begin");
         std::wstring userDataDir = webViewUserDataDirectory();
         auto weakSelf = weak_from_this();
