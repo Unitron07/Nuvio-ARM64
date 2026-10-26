@@ -146,9 +146,8 @@ internal object NativePlayerBridge {
         if (DesktopHostOs.current == DesktopHostOs.WINDOWS &&
             System.getProperty("os.arch").lowercase() in setOf("aarch64", "arm64")
         ) {
-            // Hidden HWND_MESSAGE prewarming races AWT startup on Windows ARM64
-            // (native COM exception 0x8001010d). Initialize with the real player
-            // window instead; loading the bridge itself still happens normally.
+            // On ARM64, initialize WebView2 after the player has prepared the
+            // UI Automation provider. Loading the bridge itself still happens.
             log.i { "WebView2 will initialize with the player window on Windows ARM64." }
             return
         }

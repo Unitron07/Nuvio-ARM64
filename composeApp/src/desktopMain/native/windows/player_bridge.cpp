@@ -70,51 +70,6 @@ constexpr UINT kUiTaskTimeoutMs = 2000;
 constexpr UINT kShutdownJoinTimeoutMs = 3000;
 constexpr double kMaxVolumePercent = 200.0;
 
-#if defined(_M_ARM64)
-// Opt-in development diagnostics; never handles or suppresses an exception.
-LONG CALLBACK traceComException(EXCEPTION_POINTERS *exception) {
-    static volatile LONG reported = 0;
-    if (!exception || exception->ExceptionRecord->ExceptionCode != 0x8001010d ||
-        InterlockedCompareExchange(&reported, 1, 0) != 0) return EXCEPTION_CONTINUE_SEARCH;
-    void *frames[48] = {};
-    USHORT count = CaptureStackBackTrace(0, 48, frames, nullptr);
-    std::fprintf(stderr, "[arm64-player] first COM 0x8001010d tid=%lu frames=%u\n", GetCurrentThreadId(), count);
-    for (USHORT i = 0; i < count; ++i) {
-        HMODULE module = nullptr;
-        if (GetModuleHandleExW(GET_MODULE_HANDLE_EX_FLAG_FROM_ADDRESS | GET_MODULE_HANDLE_EX_FLAG_UNCHANGED_REFCOUNT,
-                               reinterpret_cast<LPCWSTR>(frames[i]), &module)) {
-            wchar_t name[MAX_PATH] = {};
-            GetModuleFileNameW(module, name, MAX_PATH);
-            const wchar_t *baseName = wcsrchr(name, L'\\');
-            std::fprintf(stderr, "[arm64-player] frame %u %ls+0x%llx\n", i, baseName ? baseName + 1 : name,
-                         static_cast<unsigned long long>(reinterpret_cast<uintptr_t>(frames[i]) - reinterpret_cast<uintptr_t>(module)));
-        } else {
-            std::fprintf(stderr, "[arm64-player] frame %u %p\n", i, frames[i]);
-        }
-    }
-    std::fflush(stderr);
-    return EXCEPTION_CONTINUE_SEARCH;
-}
-
-void traceArm64Player(const char *phase) {
-    wchar_t enabled[2] = {};
-    if (GetEnvironmentVariableW(L"NUVIO_ARM64_PLAYER_TRACE", enabled, 2) == 0) return;
-    std::fprintf(stderr, "[arm64-player] tid=%lu inSend=0x%lx %s\n",
-                 GetCurrentThreadId(), InSendMessageEx(nullptr), phase);
-    std::fflush(stderr);
-}
-
-void enableArm64ComTrace() {
-    wchar_t enabled[2] = {};
-    if (GetEnvironmentVariableW(L"NUVIO_ARM64_PLAYER_TRACE", enabled, 2) == 0) return;
-    static std::once_flag once;
-    std::call_once(once, []() { AddVectoredExceptionHandler(1, traceComException); });
-}
-#else
-void traceArm64Player(const char *) {}
-void enableArm64ComTrace() {}
-#endif
-
 const wchar_t *kMessageWindowClass = L"NuvioPlayerBridgeMessageWindow";
 const wchar_t *kContainerWindowClass = L"NuvioPlayerBridgeContainerWindow";
 constexpr DWORD kDwmwaUseImmersiveDarkMode = 20;
@@ -717,6 +672,92 @@ class WindowsMpvWebPlayer;
 LRESULT CALLBACK messageWindowProc(HWND hwnd, UINT message, WPARAM wParam, LPARAM lParam);
 LRESULT CALLBACK containerWindowProc(HWND hwnd, UINT message, WPARAM wParam, LPARAM lParam);
 
+#if defined(_M_ARM64)
+// Initialize UI Automation's provider side outside a cross-thread WM_GETOBJECT.
+// Its first initialization can make an RPC call that is forbidden while a
+// synchronous accessibility request is being dispatched by WebView2.
+using UiaReturnProvider = LRESULT (WINAPI *)(HWND, WPARAM, LPARAM, void *);
+struct UiaBootstrapState {
+    UiaReturnProvider returnProvider;
+    bool called = false;
+};
+
+LRESULT CALLBACK uiaBootstrapWindowProc(HWND hwnd, UINT message, WPARAM wParam, LPARAM lParam) {
+    if (message == WM_NCCREATE) {
+        auto *create = reinterpret_cast<CREATESTRUCTW *>(lParam);
+        SetWindowLongPtrW(hwnd, GWLP_USERDATA, reinterpret_cast<LONG_PTR>(create->lpCreateParams));
+    } else if (message == WM_DESTROY) {
+        auto *state = reinterpret_cast<UiaBootstrapState *>(GetWindowLongPtrW(hwnd, GWLP_USERDATA));
+        if (state) {
+            // The documented WM_DESTROY cleanup form has no provider to remove
+            // for this private window, but initializes UIA's provider machinery.
+            state->returnProvider(hwnd, 0, 0, nullptr);
+            state->called = true;
+        }
+    } else if (message == WM_NCDESTROY) {
+        SetWindowLongPtrW(hwnd, GWLP_USERDATA, 0);
+    }
+    return DefWindowProcW(hwnd, message, wParam, lParam);
+}
+
+void initializeArm64UiaProvider() {
+    static std::once_flag once;
+    std::call_once(once, []() {
+        HMODULE uia = LoadLibraryExW(L"UIAutomationCore.dll", nullptr, LOAD_LIBRARY_SEARCH_SYSTEM32);
+        if (!uia) throw std::runtime_error("Unable to load Windows UI Automation for ARM64 player initialization.");
+        auto returnProvider = reinterpret_cast<UiaReturnProvider>(GetProcAddress(uia, "UiaReturnRawElementProvider"));
+        if (!returnProvider) {
+            FreeLibrary(uia);
+            throw std::runtime_error("Windows UI Automation provider initialization is unavailable.");
+        }
+
+        const wchar_t *className = L"NuvioArm64UiaBootstrapWindow";
+        WNDCLASSW windowClass = {};
+        windowClass.lpfnWndProc = uiaBootstrapWindowProc;
+        windowClass.hInstance = gModule;
+        windowClass.lpszClassName = className;
+        if (!RegisterClassW(&windowClass) && GetLastError() != ERROR_CLASS_ALREADY_EXISTS) {
+            FreeLibrary(uia);
+            throw std::runtime_error("Unable to register the ARM64 UI Automation bootstrap window.");
+        }
+        UiaBootstrapState state{returnProvider};
+        HWND window = CreateWindowExW(0, className, L"", 0, 0, 0, 0, 0, HWND_MESSAGE, nullptr, gModule, &state);
+        if (!window) {
+            FreeLibrary(uia);
+            throw std::runtime_error("Unable to create the ARM64 UI Automation bootstrap window.");
+        }
+        if (!DestroyWindow(window) || !state.called) {
+            // Avoid leaving a window with a pointer to stack storage on failure.
+            if (IsWindow(window)) SetWindowLongPtrW(window, GWLP_USERDATA, 0);
+            FreeLibrary(uia);
+            throw std::runtime_error("Unable to initialize the ARM64 UI Automation provider.");
+        }
+        // UIA's provider state is process-wide. Keep this system DLL referenced
+        // for the process lifetime so its initialized state cannot be unloaded.
+    });
+}
+
+void verifyArm64UiaProvider() {
+    std::string failure;
+    std::thread worker([&failure]() {
+        HRESULT result = OleInitialize(nullptr);
+        if (FAILED(result)) {
+            failure = hresultMessage("OleInitialize", result);
+            return;
+        }
+        try {
+            initializeArm64UiaProvider();
+            initializeArm64UiaProvider(); // The process-wide guard must be reusable.
+        } catch (const std::exception &error) {
+            failure = error.what();
+        }
+        OleUninitialize();
+    });
+    worker.join();
+    if (!failure.empty()) throw std::runtime_error(failure);
+}
+#endif
+
 void registerWindowClasses() {
     static std::once_flag once;
     std::call_once(once, []() {
@@ -1089,11 +1130,8 @@ public:
 
     void onTimer() {
         if (shuttingDown.load()) return;
-        traceArm64Player("timer layout begin");
         layoutNativeSubviews();
-        traceArm64Player("timer controls begin");
         syncControls();
-        traceArm64Player("timer complete");
     }
 
     void updateControlsJson(const std::string &controlsJson) {
@@ -1563,6 +1601,9 @@ private:
         if (FAILED(oleResult)) {
             throw std::runtime_error(hresultMessage("OleInitialize", oleResult));
         }
+#if defined(_M_ARM64)
+        initializeArm64UiaProvider();
+#endif
 
         messageHwnd = CreateWindowExW(
             0,
@@ -1682,27 +1723,17 @@ private:
         // stuck inside WebView2 teardown) blocked the caller forever. During shutdown that left the
         // player's windows alive on top of the AWT host, swallowing all input while video kept
         // playing. Bound both: a stalled UI thread now costs a short delay, not a permanent hang.
-#if defined(_M_ARM64)
-        // WebView2 tasks can issue outgoing COM calls. A sent window message
-        // puts the STA in an input-synchronous call (RPC_E_CANTCALLOUT_ININPUTSYNCCALL).
-        // A posted task plus the existing bounded completion wait avoids that
-        // COM context without dropping tasks or swallowing native exceptions.
-        if (!PostMessageW(messageHwnd, WM_NUVIO_TASK, 0, 0)) return;
-#else
         DWORD_PTR sendResult = 0;
         SendMessageTimeoutW(
             messageHwnd, WM_NUVIO_TASK, 0, 0,
             SMTO_ABORTIFHUNG | SMTO_NORMAL, kUiTaskTimeoutMs, &sendResult
         );
-#endif
 
         std::unique_lock<std::mutex> waitLock(*doneMutex);
         doneCv->wait_for(waitLock, std::chrono::milliseconds(kUiTaskTimeoutMs), [&]() { return *done; });
     }
 
     void startWebView(const std::string &controlsUrl) {
-        enableArm64ComTrace();
-        traceArm64Player("environment create begin");
         std::wstring userDataDir = webViewUserDataDirectory();
         auto weakSelf = weak_from_this();
         HRESULT result = CreateCoreWebView2EnvironmentWithOptions(
@@ -1711,7 +1742,6 @@ private:
             nullptr,
             Callback<ICoreWebView2CreateCoreWebView2EnvironmentCompletedHandler>(
                 [weakSelf, controlsUrl](HRESULT envResult, ICoreWebView2Environment *createdEnvironment) -> HRESULT {
-                    traceArm64Player("environment callback begin");
                     auto self = weakSelf.lock();
                     if (!self || self->shuttingDown.load()) return S_OK;
                     if (FAILED(envResult) || !createdEnvironment) {
@@ -1719,12 +1749,10 @@ private:
                     }
                     self->environment = createdEnvironment;
                     auto controllerWeakSelf = weakSelf;
-                    traceArm64Player("controller create begin");
                     HRESULT controllerResult = createdEnvironment->CreateCoreWebView2Controller(
                         self->containerHwnd,
                         Callback<ICoreWebView2CreateCoreWebView2ControllerCompletedHandler>(
                             [controllerWeakSelf, controlsUrl](HRESULT controllerResult, ICoreWebView2Controller *createdController) -> HRESULT {
-                                traceArm64Player("controller callback begin");
                                 auto controllerSelf = controllerWeakSelf.lock();
                                 if (!controllerSelf || controllerSelf->shuttingDown.load()) return S_OK;
                                 if (FAILED(controllerResult) || !createdController) {
@@ -1732,7 +1760,6 @@ private:
                                 }
                                 controllerSelf->controller = createdController;
                                 createdController->get_CoreWebView2(&controllerSelf->webView);
-                                traceArm64Player("controller webview obtained");
 
                                 ComPtr<ICoreWebView2Controller2> controller2;
                                 if (SUCCEEDED(createdController->QueryInterface(IID_PPV_ARGS(&controller2))) && controller2) {
@@ -1778,53 +1805,32 @@ private:
                                     controllerSelf->webView->add_WebMessageReceived(
                                         Callback<ICoreWebView2WebMessageReceivedEventHandler>(
                                             [messageWeakSelf](ICoreWebView2 *, ICoreWebView2WebMessageReceivedEventArgs *args) -> HRESULT {
-                                                traceArm64Player("web message callback begin");
                                                 auto messageSelf = messageWeakSelf.lock();
                                                 if (!messageSelf || messageSelf->shuttingDown.load() || !args) return S_OK;
                                                 PWSTR messageJson = nullptr;
                                                 if (SUCCEEDED(args->get_WebMessageAsJson(&messageJson)) && messageJson) {
-                                                    std::wstring message(messageJson);
+                                                    messageSelf->handleWebMessage(std::wstring(messageJson));
                                                     CoTaskMemFree(messageJson);
-#if defined(_M_ARM64)
-                                                    // WebView2 callbacks can arrive during an input-synchronous
-                                                    // COM call. Defer handlers that may call back into WebView2.
-                                                    messageSelf->postUiTask([messageWeakSelf, message = std::move(message)]() {
-                                                        auto target = messageWeakSelf.lock();
-                                                        if (!target || target->shuttingDown.load()) return;
-                                                        traceArm64Player("posted web message begin");
-                                                        target->handleWebMessage(message);
-                                                        traceArm64Player("posted web message complete");
-                                                    });
-#else
-                                                    messageSelf->handleWebMessage(message);
-#endif
                                                 }
-                                                traceArm64Player("web message callback complete");
                                                 return S_OK;
                                             }
                                         ).Get(),
                                         &controllerSelf->messageToken
                                     );
-                                    traceArm64Player("controller layout begin");
                                     controllerSelf->layoutNativeSubviews();
                                     std::wstring url = toWide(controlsUrl);
-                                    traceArm64Player("controller navigate begin");
                                     controllerSelf->webView->Navigate(url.c_str());
-                                    traceArm64Player("controller focus begin");
                                     createdController->MoveFocus(COREWEBVIEW2_MOVE_FOCUS_REASON_PROGRAMMATIC);
-                                    traceArm64Player("controller callback complete");
                                 }
                                 return S_OK;
                             }
                         ).Get()
                     );
                     (void)controllerResult;
-                    traceArm64Player("controller create returned");
                     return S_OK;
                 }
             ).Get()
         );
-        traceArm64Player("environment create returned");
         if (FAILED(result)) {
             throw std::runtime_error(hresultMessage("CreateCoreWebView2EnvironmentWithOptions", result));
         }
@@ -2469,18 +2475,8 @@ LRESULT CALLBACK containerWindowProc(HWND hwnd, UINT message, WPARAM wParam, LPA
             LONG w = LOWORD(lParam);
             LONG h = HIWORD(lParam);
             if (player && player->controller && w > 0 && h > 0) {
-#if defined(_M_ARM64)
-                // WM_SIZE may itself be delivered synchronously from AWT's
-                // host thread. Defer outgoing COM calls until posted dispatch.
-                player->postUiTask([self = player->shared_from_this(), w, h]() {
-                    if (self->shuttingDown.load() || !self->controller) return;
-                    RECT webBounds = {0, 0, w, h};
-                    self->controller->put_Bounds(webBounds);
-                });
-#else
                 RECT webBounds = {0, 0, w, h};
                 player->controller->put_Bounds(webBounds);
-#endif
             }
             return 0;
         }
@@ -2517,6 +2513,9 @@ BOOL APIENTRY DllMain(HMODULE module, DWORD reason, LPVOID) {
 extern "C" JNIEXPORT jstring JNICALL
 Java_com_nuvio_app_features_player_desktop_NativePlayerBridge_verifyWindowsRuntime(JNIEnv *env, jobject) {
     try {
+#if defined(_M_ARM64)
+        verifyArm64UiaProvider();
+#endif
         MpvApi &api = mpvApi();
         auto destroy = [&api](mpv_handle *handle) { api.terminateDestroy(handle); };
         std::unique_ptr<mpv_handle, decltype(destroy)> handle(api.create(), destroy);
