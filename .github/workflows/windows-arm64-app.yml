@@ -59,7 +59,27 @@ jobs:
           try { ./scripts/windows/verify-native-closure.ps1 -RuntimeDirectory build/missing-loader-test }
           catch { if ($_.Exception.Message -notmatch 'vulkan-1.dll') { throw }; $rejected=$true }
           if (-not $rejected) { throw 'Missing Vulkan loader was incorrectly accepted.' }
-      - name: Compile MSVC ARM64 bridge and create development app image
+      - name: Compile MSVC ARM64 bridge
+        id: bridge
+        shell: pwsh
+        run: |
+          New-Item -ItemType File -Force local.properties | Out-Null
+          $vswhere = "${env:ProgramFiles(x86)}/Microsoft Visual Studio/Installer/vswhere.exe"
+          $vcvars = & $vswhere -latest -products '*' -find 'VC/Auxiliary/Build/vcvarsarm64.bat' | Select-Object -First 1
+          ./gradlew.bat :composeApp:buildWindowsPlayerBridge `
+            "-Pnuvio.windows.vcvars.path=$vcvars" `
+            "-Pnuvio.webview2.dir=$pwd/build/windows-media-arm64/webview2" `
+            "-Pnuvio.windows.libmpv.runtimeDir=$pwd/build/windows-media-arm64/runtime" `
+            "-Pnuvio.windows.quickjs.dll=$pwd/build/windows-quickjs/arm64/libquickjs.dll" `
+            '-Dorg.gradle.jvmargs=-Xmx6g' --max-workers=2 --no-configuration-cache --no-daemon --console=plain
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+      - uses: actions/upload-artifact@v6
+        with:
+          name: windows-arm64-player-bridge
+          path: composeApp/build/native/windows/arm64/player_bridge.dll
+          if-no-files-found: error
+          retention-days: 7
+      - name: Create development app image
         id: image
         shell: pwsh
         run: |
@@ -108,7 +128,7 @@ jobs:
         if: always()
         shell: pwsh
         run: |
-          @('IMAGE_BUILD=${{ steps.image.outcome }}', 'IMAGE_NATIVE_AUDIT=${{ steps.audit.outcome }}', 'NATIVE_STARTUP=${{ steps.startup.outcome }}', 'SOURCE=${{ github.event.pull_request.head.sha || github.sha }}',
+          @('NATIVE_BRIDGE=${{ steps.bridge.outcome }}', 'IMAGE_BUILD=${{ steps.image.outcome }}', 'IMAGE_NATIVE_AUDIT=${{ steps.audit.outcome }}', 'NATIVE_STARTUP=${{ steps.startup.outcome }}', 'SOURCE=${{ github.event.pull_request.head.sha || github.sha }}',
             'Development evidence only. Runtime launch, playback, licensing and install validation are separate gates.') |
             Set-Content build/ARM64_VALIDATION_STATUS.txt
       - uses: actions/upload-artifact@v6

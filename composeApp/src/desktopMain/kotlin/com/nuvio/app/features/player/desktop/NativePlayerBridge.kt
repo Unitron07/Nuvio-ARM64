@@ -143,6 +143,15 @@ internal object NativePlayerBridge {
     private val controlsPageAssets: ControlsPageAssets by lazy { exportControlsPageAssets() }
 
     fun preloadAsync() {
+        if (DesktopHostOs.current == DesktopHostOs.WINDOWS &&
+            System.getProperty("os.arch").lowercase() in setOf("aarch64", "arm64")
+        ) {
+            // Hidden HWND_MESSAGE prewarming races AWT startup on Windows ARM64
+            // (native COM exception 0x8001010d). Initialize with the real player
+            // window instead; loading the bridge itself still happens normally.
+            log.i { "WebView2 will initialize with the player window on Windows ARM64." }
+            return
+        }
         if (!preloadStarted.compareAndSet(false, true)) return
         Thread {
             val controlsPage = runCatching { controlsPageAssets }

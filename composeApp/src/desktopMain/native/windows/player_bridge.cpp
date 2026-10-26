@@ -1634,11 +1634,19 @@ private:
         // stuck inside WebView2 teardown) blocked the caller forever. During shutdown that left the
         // player's windows alive on top of the AWT host, swallowing all input while video kept
         // playing. Bound both: a stalled UI thread now costs a short delay, not a permanent hang.
+#if defined(_M_ARM64)
+        // WebView2 tasks can issue outgoing COM calls. A sent window message
+        // puts the STA in an input-synchronous call (RPC_E_CANTCALLOUT_ININPUTSYNCCALL).
+        // A posted task plus the existing bounded completion wait avoids that
+        // COM context without dropping tasks or swallowing native exceptions.
+        if (!PostMessageW(messageHwnd, WM_NUVIO_TASK, 0, 0)) return;
+#else
         DWORD_PTR sendResult = 0;
         SendMessageTimeoutW(
             messageHwnd, WM_NUVIO_TASK, 0, 0,
             SMTO_ABORTIFHUNG | SMTO_NORMAL, kUiTaskTimeoutMs, &sendResult
         );
+#endif
 
         std::unique_lock<std::mutex> waitLock(*doneMutex);
         doneCv->wait_for(waitLock, std::chrono::milliseconds(kUiTaskTimeoutMs), [&]() { return *done; });
