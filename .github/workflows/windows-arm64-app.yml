@@ -1,0 +1,149 @@
+name: Windows ARM64 development image
+on:
+  pull_request:
+    paths:
+      - scripts/windows/**
+      - composeApp/build.gradle.kts
+      - composeApp/src/desktopMain/**
+      - .github/workflows/windows-arm64-app.yml
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  native-image:
+    runs-on: windows-11-arm
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v6
+      - name: Verify player shortcut key variants
+        run: node scripts/windows/test-player-shortcuts.mjs
+      - uses: actions/setup-java@v5
+        with:
+          distribution: microsoft
+          java-version: '21'
+          architecture: aarch64
+      - name: Build verified QuickJS JNI
+        shell: pwsh
+        run: ./scripts/windows/build-quickjs.ps1
+      - name: Acquire pinned media and build ARM64 Vulkan loader
+        shell: pwsh
+        run: ./scripts/windows/build-media-runtime.ps1
+      - name: Resolve standalone JNA for native lifecycle probe
+        shell: pwsh
+        run: |
+          ./gradlew.bat -p scripts/windows/quickjs-smoke copyJna --no-daemon --console=plain
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+      - name: Exercise actual ARM64 lifecycle and unload
+        shell: pwsh
+        run: |
+          & "$env:JAVA_HOME/bin/java.exe" '-Dmpv.cycles=30' `
+            -cp scripts/windows/quickjs-smoke/build/jna/jna-5.19.1.jar `
+            scripts/windows/MpvProbe.java build/windows-media-arm64/runtime/libmpv-2.dll `
+            osc=no load-scripts=no load-stats-overlay=no load-console=no load-auto-profiles=no `
+            ytdl=no load-select=no load-positioning=no load-commands=no load-context-menu=no d3d11-exclusive-fs=no
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+      - name: Decode and seek a generated video over HTTP
+        shell: pwsh
+        run: |
+          python scripts/windows/make-smoke-avi.py build/fixture.avi
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          & "$env:JAVA_HOME/bin/java.exe" -cp scripts/windows/quickjs-smoke/build/jna/jna-5.19.1.jar `
+            scripts/windows/MpvHttpSmoke.java build/windows-media-arm64/runtime/libmpv-2.dll build/fixture.avi
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+      - name: Verify portable native dependency closure
+        shell: pwsh
+        run: |
+          ./scripts/windows/verify-native-closure.ps1 -RuntimeDirectory build/windows-media-arm64/runtime
+          # A globally installed Vulkan loader must not hide a missing bundled one.
+          New-Item -ItemType Directory build/missing-loader-test | Out-Null
+          Copy-Item build/windows-media-arm64/runtime/libmpv-2.dll build/missing-loader-test/
+          $rejected=$false
+          try { ./scripts/windows/verify-native-closure.ps1 -RuntimeDirectory build/missing-loader-test }
+          catch { if ($_.Exception.Message -notmatch 'vulkan-1.dll') { throw }; $rejected=$true }
+          if (-not $rejected) { throw 'Missing Vulkan loader was incorrectly accepted.' }
+      - name: Compile MSVC ARM64 bridge
+        id: bridge
+        shell: pwsh
+        run: |
+          New-Item -ItemType File -Force local.properties | Out-Null
+          $vswhere = "${env:ProgramFiles(x86)}/Microsoft Visual Studio/Installer/vswhere.exe"
+          $vcvars = & $vswhere -latest -products '*' -find 'VC/Auxiliary/Build/vcvarsarm64.bat' | Select-Object -First 1
+          ./gradlew.bat :composeApp:buildWindowsPlayerBridge `
+            "-Pnuvio.windows.vcvars.path=$vcvars" `
+            "-Pnuvio.webview2.dir=$pwd/build/windows-media-arm64/webview2" `
+            "-Pnuvio.windows.libmpv.runtimeDir=$pwd/build/windows-media-arm64/runtime" `
+            "-Pnuvio.windows.quickjs.dll=$pwd/build/windows-quickjs/arm64/libquickjs.dll" `
+            '-Dorg.gradle.jvmargs=-Xmx6g' --max-workers=2 --no-configuration-cache --no-daemon --console=plain
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+      - uses: actions/upload-artifact@v6
+        with:
+          name: windows-arm64-player-bridge
+          path: composeApp/build/native/windows/arm64/player_bridge.dll
+          if-no-files-found: error
+          retention-days: 7
+      - name: Create development app image
+        id: image
+        shell: pwsh
+        run: |
+          New-Item -ItemType File -Force local.properties | Out-Null
+          $vswhere = "${env:ProgramFiles(x86)}/Microsoft Visual Studio/Installer/vswhere.exe"
+          $vcvars = & $vswhere -latest -products '*' -find 'VC/Auxiliary/Build/vcvarsarm64.bat' | Select-Object -First 1
+          ./gradlew.bat :composeApp:createDistributable `
+            "-Pnuvio.windows.vcvars.path=$vcvars" `
+            "-Pnuvio.webview2.dir=$pwd/build/windows-media-arm64/webview2" `
+            "-Pnuvio.windows.libmpv.runtimeDir=$pwd/build/windows-media-arm64/runtime" `
+            "-Pnuvio.windows.quickjs.dll=$pwd/build/windows-quickjs/arm64/libquickjs.dll" `
+            '-Dorg.gradle.jvmargs=-Xmx6g' '-Pkotlin.compiler.execution.strategy=in-process' `
+            --max-workers=2 --no-configuration-cache --no-daemon --console=plain
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+      - name: Audit native architectures in the development image
+        id: audit
+        shell: pwsh
+        run: |
+          ./scripts/windows/test-image-audit.ps1
+          ./scripts/windows/audit-arm64-image.ps1 -ImageDirectory composeApp/build/compose/binaries/main/app -PruneForeignJarNatives
+          New-Item -ItemType Directory -Force build/bridge-closure | Out-Null
+          Copy-Item composeApp/build/native/windows-runtime/arm64/*.dll build/bridge-closure/
+          Copy-Item composeApp/build/native/windows/arm64/player_bridge.dll build/bridge-closure/
+          ./scripts/windows/verify-native-closure.ps1 -RuntimeDirectory build/bridge-closure
+      - name: Run packaged native prerequisite smoke
+        id: startup
+        shell: pwsh
+        run: |
+          $image=Get-ChildItem composeApp/build/compose/binaries/main/app -Directory | Select-Object -First 1
+          $launcher=Get-ChildItem $image.FullName -File -Filter '*.exe' | Select-Object -First 1
+          # Isolated process configuration; no provider tokens or user profiles.
+          $env:APPDATA="$env:RUNNER_TEMP/nuvio-smoke/appdata"
+          $env:LOCALAPPDATA="$env:RUNNER_TEMP/nuvio-smoke/localappdata"
+          New-Item -ItemType Directory -Force $env:APPDATA,$env:LOCALAPPDATA | Out-Null
+          $process=Start-Process -FilePath $launcher.FullName -ArgumentList '--native-runtime-smoke' `
+            -WindowStyle Hidden -PassThru -RedirectStandardOutput "$pwd/build/packaged-smoke.log" `
+            -RedirectStandardError "$pwd/build/packaged-smoke-error.log"
+          if (-not $process.WaitForExit(180000)) { $process.Kill(); throw 'Packaged native smoke timed out.' }
+          Get-Content build/packaged-smoke.log
+          Get-Content build/packaged-smoke-error.log
+          if ($process.ExitCode -ne 0) { throw "Packaged native smoke failed: $($process.ExitCode)" }
+          if ((Get-Content build/packaged-smoke.log -Raw) -notmatch 'PASS: native prerequisite smoke') {
+            throw 'Launcher did not report completed native prerequisite smoke.'
+          }
+      - name: Record development artifact status
+        if: always()
+        shell: pwsh
+        run: |
+          @('NATIVE_BRIDGE=${{ steps.bridge.outcome }}', 'IMAGE_BUILD=${{ steps.image.outcome }}', 'IMAGE_NATIVE_AUDIT=${{ steps.audit.outcome }}', 'NATIVE_STARTUP=${{ steps.startup.outcome }}', 'SOURCE=${{ github.event.pull_request.head.sha || github.sha }}',
+            'Development evidence only. Runtime launch, playback, licensing and install validation are separate gates.') |
+            Set-Content build/ARM64_VALIDATION_STATUS.txt
+      - uses: actions/upload-artifact@v6
+        if: always()
+        with:
+          name: windows-arm64-development-evidence
+          path: |
+            build/ARM64_VALIDATION_STATUS.txt
+            build/packaged-smoke*.log
+            composeApp/build/native/windows/arm64/
+            build/windows-media-arm64/runtime/
+            build/windows-media-arm64/provenance.json
+            build/windows-media-arm64/notices/
+            composeApp/build/compose/binaries/main/app/
+          if-no-files-found: warn
+          retention-days: 7

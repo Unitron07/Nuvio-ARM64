@@ -10,6 +10,8 @@ import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.setValue
 import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Modifier
 import org.jetbrains.compose.resources.painterResource
@@ -26,6 +28,9 @@ import com.nuvio.app.features.discordrpc.DiscordPresenceManager
 import com.nuvio.app.features.p2p.P2pStreamingEngine
 import com.nuvio.app.features.plugins.configureDesktopQuickJsLibrary
 import com.nuvio.app.features.player.PlatformPlayerSurface
+import com.nuvio.app.features.player.PlayerEngineController
+import com.nuvio.app.features.player.PlayerControlsState
+import com.nuvio.app.features.player.PlayerControlsAction
 import com.nuvio.app.features.player.desktop.DesktopAppFullscreenController
 import com.nuvio.app.features.player.desktop.DesktopHostOs
 import com.nuvio.app.features.player.desktop.DesktopWindowGeometry
@@ -51,6 +56,10 @@ private const val MacosDarkAquaAppearance = "NSAppearanceNameDarkAqua"
 
 @OptIn(ExperimentalComposeUiApi::class)
 fun main(args: Array<String>) {
+    if (args.contentEquals(arrayOf("--native-runtime-smoke"))) {
+        runWindowsNativeStartupSmoke()
+        return
+    }
     // On Linux, initialize GTK BEFORE AWT/Compose/Skia to prevent GdkDisplayManager
     // type registration conflict (Skiko partially loads GDK without full GTK init).
     if (System.getProperty("os.name", "").lowercase().contains("linux")) {
@@ -120,14 +129,28 @@ fun main(args: Array<String>) {
             placement = initialPlacement,
         )
         val fullscreenController = remember { DesktopAppFullscreenController() }
+        val smokeController = remember { arrayOfNulls<PlayerEngineController>(1) }
+        val closeApplication = {
+            P2pStreamingEngine.shutdown()
+            DiscordPresenceManager.shutdown()
+            SentryInitializer.close()
+            exitApplication()
+        }
+        val requestClose: () -> Unit = {
+            val controller = smokeController[0]
+            if (smokePlayerUrl != null && controller != null) {
+                controller.releaseBeforeNavigation(
+                    onReleased = {
+                        println("PLAYER_SMOKE native release completed")
+                        closeApplication()
+                    },
+                    onReleaseFailed = { System.err.println("PLAYER_SMOKE native release failed: $it") },
+                )
+            } else closeApplication()
+        }
 
         SwingWindow(
-            onCloseRequest = {
-                P2pStreamingEngine.shutdown()
-                DiscordPresenceManager.shutdown()
-                SentryInitializer.close()
-                exitApplication()
-            },
+            onCloseRequest = requestClose,
             title = if (smokePlayerUrl == null) "Nuvio" else "Nuvio Player Smoke",
             state = windowState,
             icon = painterResource(appIconState.selected.transparentPreviewResource),
@@ -220,13 +243,64 @@ fun main(args: Array<String>) {
             } else {
                 // The player surface reads LocalNuvioPlatformDensity, which only
                 // NuvioTheme provides — the bare smoke harness must supply it too.
+                val smokeReporting = System.getenv("NUVIO_DESKTOP_SMOKE_REPORT") == "1"
+                val lastSmokeProgress = remember { longArrayOf(-1, -1, -1) }
+                // The bare surface delegates chrome visibility to its route,
+                // just as PlayerScreenRuntime does. Without this feedback,
+                // native auto-hide permanently hides the smoke controls.
+                var smokeControls by remember { mutableStateOf(PlayerControlsState()) }
                 NuvioTheme {
                     PlatformPlayerSurface(
                         sourceUrl = smokePlayerUrl,
                         modifier = Modifier.fillMaxSize(),
-                        onControllerReady = {},
-                        onSnapshot = {},
-                        onError = {},
+                        onControllerReady = { smokeController[0] = it },
+                        playerControlsState = smokeControls,
+                        onPlayerControlsEvent = { type, _ ->
+                            when (type) {
+                                "cursorActivity", "keepChromeVisible", "setPlaybackState" -> {
+                                    smokeControls = smokeControls.copy(controlsVisible = true)
+                                    true
+                                }
+                                "hideChrome" -> {
+                                    smokeControls = smokeControls.copy(controlsVisible = false)
+                                    true
+                                }
+                                else -> false
+                            }
+                        },
+                        onPlayerControlsAction = { action ->
+                            when (action) {
+                                PlayerControlsAction.ToggleChrome -> {
+                                    smokeControls = smokeControls.copy(controlsVisible = !smokeControls.controlsVisible)
+                                    true
+                                }
+                                PlayerControlsAction.Back -> { requestClose(); true }
+                                else -> false
+                            }
+                        },
+                        onSnapshot = { snapshot ->
+                            smokeControls = smokeControls.copy(
+                                isPlaying = snapshot.isPlaying,
+                                isLoading = snapshot.isLoading,
+                                durationMs = snapshot.durationMs,
+                                positionMs = snapshot.positionMs,
+                                bufferedPositionMs = snapshot.bufferedPositionMs,
+                            )
+                            if (smokeReporting) {
+                                val second = snapshot.positionMs / 1000
+                                val phase = (if (snapshot.isPlaying) 1L else 0L) or (if (snapshot.isEnded) 2L else 0L)
+                                if (lastSmokeProgress[0] != second || lastSmokeProgress[1] != snapshot.durationMs ||
+                                    lastSmokeProgress[2] != phase
+                                ) {
+                                    lastSmokeProgress[0] = second
+                                    lastSmokeProgress[1] = snapshot.durationMs
+                                    lastSmokeProgress[2] = phase
+                                    println("PLAYER_SMOKE positionMs=${snapshot.positionMs} durationMs=${snapshot.durationMs} " +
+                                        "playing=${snapshot.isPlaying} ended=${snapshot.isEnded}")
+                                }
+                            }
+                        },
+                        onError = { if (smokeReporting) System.err.println("PLAYER_SMOKE error") },
                     )
                 }
             }

@@ -2559,10 +2559,21 @@ const requestPlaybackState = (eventType, revealControls) => {
 const isInteractiveControlTarget = target => Boolean(
   target && target.closest && target.closest("button, input, textarea, select, a, [contenteditable='true']"),
 );
+// Windows virtual/accessibility keyboard input can have a key but no physical
+// code. Preserve physical shortcuts and accept the two playback keys in that
+// case, including both halves of Space's tap/hold gesture.
+const playbackShortcutCode = event => {
+  if (event.isComposing) return "";
+  if (event.code && event.code !== "Unidentified") return event.code;
+  if (event.key === " " || event.key === "Spacebar") return "Space";
+  if (event.key === "k" || event.key === "K") return "KeyK";
+  return "";
+};
+
 const shortcutCommandForEvent = event => {
   if (event.metaKey || event.ctrlKey || event.altKey) return "";
   const isShift = Boolean(event.shiftKey);
-  switch (event.code) {
+  switch (playbackShortcutCode(event)) {
     case "KeyK":
       return "keyboardToggle";
     case "ArrowLeft":
@@ -3680,7 +3691,7 @@ document.addEventListener("keyup", event => {
     clearSpaceHoldTimerAndStopSpeedBoost();
     return;
   }
-  if (event.code === "Space") {
+  if (playbackShortcutCode(event) === "Space") {
     if (clearSpaceHoldTimerAndStopSpeedBoost()) return;
     if (event.metaKey || event.ctrlKey || event.altKey) return;
     if (activeModal || isTextEntryTarget(event.target)) return;
@@ -4016,7 +4027,7 @@ document.addEventListener("keydown", event => {
     return;
   }
 
-  if (canSpeedBoostStart() && event.code === "Space") {
+  if (canSpeedBoostStart() && playbackShortcutCode(event) === "Space") {
     event.preventDefault();
     if (event.repeat) {
       if (!isSpeedBoosting) {

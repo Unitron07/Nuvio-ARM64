@@ -566,28 +566,54 @@ struct MpvApi {
         DWORD envCapacity = (DWORD)(sizeof(envPath) / sizeof(envPath[0]));
         DWORD envLength = GetEnvironmentVariableW(L"NUVIO_LIBMPV_PATH", envPath, envCapacity);
         if (envLength > 0 && envLength < envCapacity) {
+#if defined(_M_ARM64)
+            std::wstring overridePath(envPath, envPath + envLength);
+            bool absolute = (overridePath.size() > 2 && overridePath[1] == L':' &&
+                (overridePath[2] == L'\\' || overridePath[2] == L'/')) ||
+                overridePath.rfind(L"\\\\", 0) == 0;
+            if (!absolute) {
+                loadFailure = "NUVIO_LIBMPV_PATH must be an absolute ARM64 DLL path.";
+                return;
+            }
+#endif
             candidates.emplace_back(envPath, envPath + envLength);
         }
 
         std::wstring moduleDir = moduleDirectory();
-        if (!moduleDir.empty()) {
+        if (!moduleDir.empty()
+#if defined(_M_ARM64)
+            && candidates.empty()
+#endif
+        ) {
             candidates.push_back(moduleDir + L"\\libmpv-2.dll");
         }
+#if !defined(_M_ARM64)
         candidates.push_back(L"libmpv-2.dll");
         candidates.push_back(L"C:\\Program Files (x86)\\Nuvio\\app\\native\\libmpv-2.dll");
         candidates.push_back(L"C:\\msys64\\ucrt64\\bin\\libmpv-2.dll");
+#endif
 
+        DWORD lastLoadError = ERROR_MOD_NOT_FOUND;
         for (const std::wstring &candidate : candidates) {
+#if defined(_M_ARM64)
+            library = LoadLibraryExW(candidate.c_str(), nullptr,
+                LOAD_LIBRARY_SEARCH_DLL_LOAD_DIR | LOAD_LIBRARY_SEARCH_SYSTEM32);
+#else
             if (candidate.find(L'\\') != std::wstring::npos || candidate.find(L'/') != std::wstring::npos) {
                 library = LoadLibraryExW(candidate.c_str(), nullptr, LOAD_WITH_ALTERED_SEARCH_PATH);
             } else {
                 library = LoadLibraryW(candidate.c_str());
             }
+#endif
             if (library) break;
+            lastLoadError = GetLastError();
         }
 
         if (!library) {
             loadFailure = "Unable to load libmpv-2.dll. Bundle it under native/windows or set NUVIO_LIBMPV_PATH.";
+#if defined(_M_ARM64)
+            loadFailure += " ARM64 and its bundled dependency closure are required; Win32 error " + std::to_string(lastLoadError) + ".";
+#endif
             return;
         }
 
@@ -625,9 +651,112 @@ MpvApi &mpvApi() {
     return api;
 }
 
+void configureArm64EmbeddedMpv(MpvApi &api, mpv_handle *handle) {
+#if defined(_M_ARM64)
+    // Nuvio supplies controls and HTTP source resolution; QuickJS plugins are
+    // independent. Avoid LuaJIT built-in script threads in the ARM64 JVM.
+    for (const char *option : {"osc", "load-scripts", "load-stats-overlay",
+            "load-console", "load-auto-profiles", "ytdl", "load-select",
+            "load-positioning", "load-commands", "load-context-menu",
+            "d3d11-exclusive-fs"}) {
+        if (api.setOptionString(handle, option, "no") < 0) {
+            throw std::runtime_error(std::string("ARM64 embedded mpv option is unavailable: ") + option);
+        }
+    }
+#else
+    (void)api; (void)handle;
+#endif
+}
+
 class WindowsMpvWebPlayer;
 LRESULT CALLBACK messageWindowProc(HWND hwnd, UINT message, WPARAM wParam, LPARAM lParam);
 LRESULT CALLBACK containerWindowProc(HWND hwnd, UINT message, WPARAM wParam, LPARAM lParam);
+
+#if defined(_M_ARM64)
+// Initialize UI Automation's provider side outside a cross-thread WM_GETOBJECT.
+// Its first initialization can make an RPC call that is forbidden while a
+// synchronous accessibility request is being dispatched by WebView2.
+using UiaReturnProvider = LRESULT (WINAPI *)(HWND, WPARAM, LPARAM, void *);
+struct UiaBootstrapState {
+    UiaReturnProvider returnProvider;
+    bool called = false;
+};
+
+LRESULT CALLBACK uiaBootstrapWindowProc(HWND hwnd, UINT message, WPARAM wParam, LPARAM lParam) {
+    if (message == WM_NCCREATE) {
+        auto *create = reinterpret_cast<CREATESTRUCTW *>(lParam);
+        SetWindowLongPtrW(hwnd, GWLP_USERDATA, reinterpret_cast<LONG_PTR>(create->lpCreateParams));
+    } else if (message == WM_DESTROY) {
+        auto *state = reinterpret_cast<UiaBootstrapState *>(GetWindowLongPtrW(hwnd, GWLP_USERDATA));
+        if (state) {
+            // The documented WM_DESTROY cleanup form has no provider to remove
+            // for this private window, but initializes UIA's provider machinery.
+            state->returnProvider(hwnd, 0, 0, nullptr);
+            state->called = true;
+        }
+    } else if (message == WM_NCDESTROY) {
+        SetWindowLongPtrW(hwnd, GWLP_USERDATA, 0);
+    }
+    return DefWindowProcW(hwnd, message, wParam, lParam);
+}
+
+void initializeArm64UiaProvider() {
+    static std::once_flag once;
+    std::call_once(once, []() {
+        HMODULE uia = LoadLibraryExW(L"UIAutomationCore.dll", nullptr, LOAD_LIBRARY_SEARCH_SYSTEM32);
+        if (!uia) throw std::runtime_error("Unable to load Windows UI Automation for ARM64 player initialization.");
+        auto returnProvider = reinterpret_cast<UiaReturnProvider>(GetProcAddress(uia, "UiaReturnRawElementProvider"));
+        if (!returnProvider) {
+            FreeLibrary(uia);
+            throw std::runtime_error("Windows UI Automation provider initialization is unavailable.");
+        }
+
+        const wchar_t *className = L"NuvioArm64UiaBootstrapWindow";
+        WNDCLASSW windowClass = {};
+        windowClass.lpfnWndProc = uiaBootstrapWindowProc;
+        windowClass.hInstance = gModule;
+        windowClass.lpszClassName = className;
+        if (!RegisterClassW(&windowClass) && GetLastError() != ERROR_CLASS_ALREADY_EXISTS) {
+            FreeLibrary(uia);
+            throw std::runtime_error("Unable to register the ARM64 UI Automation bootstrap window.");
+        }
+        UiaBootstrapState state{returnProvider};
+        HWND window = CreateWindowExW(0, className, L"", 0, 0, 0, 0, 0, HWND_MESSAGE, nullptr, gModule, &state);
+        if (!window) {
+            FreeLibrary(uia);
+            throw std::runtime_error("Unable to create the ARM64 UI Automation bootstrap window.");
+        }
+        if (!DestroyWindow(window) || !state.called) {
+            // Avoid leaving a window with a pointer to stack storage on failure.
+            if (IsWindow(window)) SetWindowLongPtrW(window, GWLP_USERDATA, 0);
+            FreeLibrary(uia);
+            throw std::runtime_error("Unable to initialize the ARM64 UI Automation provider.");
+        }
+        // UIA's provider state is process-wide. Keep this system DLL referenced
+        // for the process lifetime so its initialized state cannot be unloaded.
+    });
+}
+
+void verifyArm64UiaProvider() {
+    std::string failure;
+    std::thread worker([&failure]() {
+        HRESULT result = OleInitialize(nullptr);
+        if (FAILED(result)) {
+            failure = hresultMessage("OleInitialize", result);
+            return;
+        }
+        try {
+            initializeArm64UiaProvider();
+            initializeArm64UiaProvider(); // The process-wide guard must be reusable.
+        } catch (const std::exception &error) {
+            failure = error.what();
+        }
+        OleUninitialize();
+    });
+    worker.join();
+    if (!failure.empty()) throw std::runtime_error(failure);
+}
+#endif
 
 void registerWindowClasses() {
     static std::once_flag once;
@@ -1472,6 +1601,9 @@ private:
         if (FAILED(oleResult)) {
             throw std::runtime_error(hresultMessage("OleInitialize", oleResult));
         }
+#if defined(_M_ARM64)
+        initializeArm64UiaProvider();
+#endif
 
         messageHwnd = CreateWindowExW(
             0,
@@ -1724,6 +1856,7 @@ private:
 
             setMpvOptionStringLocked("config", "no");
             setMpvOptionStringLocked("osc", "no");
+            configureArm64EmbeddedMpv(api, mpv);
             setMpvOptionStringLocked("input-default-bindings", "yes");
             setMpvOptionStringLocked("input-vo-keyboard", "no");
             setMpvOptionStringLocked("keep-open", "yes");
@@ -2375,6 +2508,37 @@ BOOL APIENTRY DllMain(HMODULE module, DWORD reason, LPVOID) {
         DisableThreadLibraryCalls(module);
     }
     return TRUE;
+}
+
+extern "C" JNIEXPORT jstring JNICALL
+Java_com_nuvio_app_features_player_desktop_NativePlayerBridge_verifyWindowsRuntime(JNIEnv *env, jobject) {
+    try {
+#if defined(_M_ARM64)
+        verifyArm64UiaProvider();
+#endif
+        MpvApi &api = mpvApi();
+        auto destroy = [&api](mpv_handle *handle) { api.terminateDestroy(handle); };
+        std::unique_ptr<mpv_handle, decltype(destroy)> handle(api.create(), destroy);
+        if (!handle) throw std::runtime_error("mpv_create failed.");
+        for (const auto &option : {std::pair<const char *, const char *>("config", "no"),
+                {"vo", "null"}, {"ao", "null"}, {"terminal", "no"}}) {
+            if (api.setOptionString(handle.get(), option.first, option.second) < 0)
+                throw std::runtime_error("mpv smoke option failed.");
+        }
+        configureArm64EmbeddedMpv(api, handle.get());
+        int result = api.initialize(handle.get());
+        if (result < 0) throw std::runtime_error("mpv_initialize: " + api.errorText(result));
+        char *version = nullptr;
+        result = api.getProperty(handle.get(), "mpv-version", MPV_FORMAT_STRING, &version);
+        if (result < 0 || !version) throw std::runtime_error("mpv-version query failed.");
+        std::string message(version);
+        api.freeValue(version);
+        handle.reset(); // Actual teardown must finish before reporting success.
+        return env->NewStringUTF((message + "; initialized and destroyed through JNI").c_str());
+    } catch (const std::exception &error) {
+        throwJavaError(env, error.what());
+        return nullptr;
+    }
 }
 
 extern "C" JNIEXPORT jlong JNICALL

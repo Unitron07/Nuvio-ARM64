@@ -5,6 +5,11 @@ plugins {
 dependencies {
     implementation("io.github.dokar3:quickjs-kt:1.0.15")
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.10.2")
+    runtimeOnly("net.java.dev.jna:jna:5.19.1")
+}
+tasks.register<Copy>("copyJna") {
+    from(configurations.runtimeClasspath.map { it.filter { file -> file.name == "jna-5.19.1.jar" } })
+    into(layout.buildDirectory.dir("jna"))
 }
 application { mainClass.set("QuickJsSmokeKt") }
 tasks.named<JavaExec>("run") {

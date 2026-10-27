@@ -1,9 +1,10 @@
 # Windows ARM64 and Surface Pro 11
 
-Status: native Windows ARM64 QuickJS JNI built and smoke-tested;
-**not a working ARM64 application or installer yet**.
+Status: native Windows ARM64 bridge and development application image built;
+packaged native prerequisite smoke and local welcome-screen rendering passed.
+Embedded player, authenticated services and installer validation remain gates.
 Baseline: [NuvioMedia/NuvioDesktop Dev](https://github.com/NuvioMedia/NuvioDesktop/tree/5e18596aa919a6a4e7b6cdee7f90dfaabbf71b00), commit `5e18596aa919a6a4e7b6cdee7f90dfaabbf71b00`.
-Inspection: October 24–25, 2026.
+Inspection: October 24–26, 2026.
 
 ## Stage 2: QuickJS JNI source build
 
@@ -95,7 +96,7 @@ than all plugin services or the full application. The original x64 application
 release pipeline and touch implementation are unchanged; full x64 app, provider,
 playback and input regression runs were not repeated for this tooling milestone.
 
-### libmpv candidate investigation (not accepted for staging)
+### Initial libmpv candidate investigation (historical failure)
 
 The mpv.io-linked shinchiro builder publishes an actual ARM64 libmpv. The inspected
 candidate is [20261021 mpv-dev-aarch64](https://github.com/shinchiro/mpv-winbuild-cmake/releases/tag/20261021),
@@ -141,6 +142,156 @@ source/build recipes and notices before distribution. A builder snapshot alone
 does not freeze its moving git dependencies; any source rebuild must also pin
 the complete recipe dependency graph. The QuickJS milestone can be reviewed and
 used independently while this media runtime gate remains open.
+
+### Media runtime continuation: October 26, 2026
+
+PR #2 was merged externally after the QuickJS handoff. This continuation starts
+from verified `main` commit `29ed3b71216a86c18fb21e180b7ef92dd7e4fbef` and is
+tracked in [draft PR #3](https://github.com/Unitron07/Nuvio-ARM64/pull/3).
+The initial candidate observations above are historical; the following tests
+resolve the cleanup and missing-loader gates for development staging.
+
+The native exception `0xe24c4a02` is consistent with
+[LuaJIT's Windows exception propagation](https://github.com/LuaJIT/LuaJIT/blob/v2.1/src/lj_err.c)
+and the [builder's embedding report](https://github.com/shinchiro/mpv-winbuild-cmake/issues/811).
+The default-script baseline is intermittent: a 30-cycle test reproduced the
+crash after its first destruction. The ARM64 embedding preset disables `osc`,
+`load-scripts`, `load-stats-overlay`, `load-console`, `load-auto-profiles`,
+`ytdl`, `load-select`, `load-positioning`, `load-commands` and `load-context-menu`
+before initialization, and disables exclusive fullscreen. Nuvio supplies its own
+controls and source resolution. QuickJS plugin execution remains separate.
+The x64 mpv options are unchanged. Normal `mpv_terminate_destroy` and library
+unloading remain in place; the fix does not suppress native exceptions or skip
+cleanup. This preset passes 30 initialization/destruction cycles and final DLL
+unload on this Surface and native ARM64 CI. It establishes a tested mitigation
+for this pinned runtime, not a general LuaJIT ARM64 fix.
+
+`build-media-runtime.ps1` verifies the candidate archive hash above and builds
+Khronos Vulkan-Loader v1.4.328 from commit
+`f703f919c30c5b67958d35d40a4297cb3823ed78`, using Vulkan-Headers
+`9a0f3099c8a9607a7c0f3127d8abfdc19a93e8c5`, MSVC ARM64 and ARM64 assembly.
+It bundles `vulkan-1.dll` beside libmpv, with notices and file/source hashes.
+WebView2 SDK 1.0.4078.44 is hash pinned and its ARM64 loader is verified.
+`verify-native-closure.ps1` rejects unbundled non-system imports; a negative test
+proves a globally installed Vulkan loader cannot hide a missing bundled loader.
+The ARM64 bridge uses an absolute colocated DLL path and restricted DLL search.
+ARM64 staging does not copy compatibility CRTs from System32, where an ARM64
+host may contain AMD64 binaries. The bridge explicitly uses the static CRT.
+
+The generated 64x36, two-second AVI fixture passes loopback HTTP loading, decoded
+video-property checks, seeking, EOF, destruction and unloading locally and in
+native CI. The probe deliberately uses null video/audio outputs and software
+decoding. This does not validate D3D11 hardware decoding, audible output,
+subtitles, WebView2 controls, provider authentication or real debrid streams.
+
+The development workflow builds the player bridge and app image, audits native
+PE architecture (including JAR resources), and runs `--native-runtime-smoke`
+with isolated process configuration. This opt-in mode checks packaged JVM,
+JNA, Skiko raster initialization, QuickJS evaluation/disposal and five actual
+JNI bridge/libmpv creation/destruction cycles before normal UI/services start.
+Read `ARM64_VALIDATION_STATUS.txt` in each artifact: a retained failed run is
+diagnostic evidence, not a validated app. Foreign Windows native resources are
+removed only from dependency JAR copies in the built ARM64 image; classes and
+ARM64 resources are preserved. The audit refuses foreign standalone PE files.
+
+Temporary Actions artifacts have seven-day retention and are development
+evidence only. No release or installer is published. The pinned binary's full
+static dependency license/notices and corresponding-source audit remains a
+distribution gate; the archived builder revision alone does not pin its entire
+moving dependency graph. Full UI, GPU playback, Surface input, x64 application
+regression and install/update validation remain separate gates.
+
+[Native image run 40379364086](https://github.com/Unitron07/Nuvio-ARM64/actions/runs/40379364086)
+passes at source commit `a15e3e2da09fe2c54d17b9e54f96e59c063e2d3b`.
+MSVC compiles `player_bridge.dll` for ARM64; its imports are WebView2Loader and
+Windows OS libraries, with no dynamic C++ CRT dependency. Gradle produces the
+development app image in 6m50s. The image audit verifies 34 ARM64 native files
+and resources, removing five foreign Windows native resources from built-image
+JARs. Its actual launcher reports ARM64 JDK 21.0.11, successful JNA/Skiko raster
+initialization, packaged QuickJS evaluation/disposal, and all five JNI libmpv
+initialization/destruction cycles. This is the first verified development image,
+not an installer or proof of full UI/GPU/provider playback.
+
+Normal Surface startup subsequently exposed a defect in the initial native
+auditor: .NET ZIP Update mode corrupted Java-compatible local headers even for
+untouched JARs. The initial CI images above are diagnostic-only. Commit
+`353ddbfd40b26c753805a31f25cae4ec5d540ada` switches inspection to read-only,
+leaves unaffected JAR bytes intact, and copies retained entries into a fresh ZIP
+only when native resources need removal. Regression tests compile a real Java
+class, create JARs with Java's tool, assert unchanged JAR hashes and load classes
+from both unchanged and pruned JARs. Packaged smoke additionally initializes
+SLF4J and Ktor content negotiation. The
+[corrected CI run 40384081971](https://github.com/Unitron07/Nuvio-ARM64/actions/runs/40384081971)
+passes the complete image/audit/expanded startup sequence.
+
+A clean local image built with ARM64 JDK 21.0.12.1+1 and the verified MSVC bridge
+passes the expanded packaged smoke. Skiko renders the welcome screen on this
+Surface, with an isolated app/WebView2 profile and no provider credentials.
+The empty build configuration uses `https://localhost` for Supabase, so account
+and catalog data are unavailable; this is a configuration gate, not a successful
+provider test. ARM64 skips optional hidden-window WebView2 prewarming after a
+native COM exception `0x8001010d` was reproduced during normal startup. Loading
+the bridge itself remains enabled; WebView2 initializes with a player window.
+
+The embedded player initially reproduced `0x8001010d` before WebView2 controller
+creation completed. Native stack symbols identify UIAutomationCore provider
+initialization during synchronous accessibility handling. The ARM64 bridge now
+initializes the UIA provider on its ordinary STA before creating WebView2, using
+the documented `UiaReturnRawElementProvider(hwnd, 0, 0, nullptr)` cleanup call
+from a private window's WM_DESTROY handler. It preserves accessibility and normal
+exception handling. Experimental message-dispatch changes were reverted.
+
+On October 27, 2026, the compiled native fix rendered the 30-second generated
+loopback HTTP video without the diagnostic Java agent. UI Automation queried
+the embedded controls and sought backward to 5.01 seconds and forward to 20.01
+seconds; the video image and time display changed accordingly. A rebuilt image
+using ARM64 JDK 21.0.12.1+1 repeated both seeks, resumed advancing, completed
+`pre-navigation dispose` and the explicit native release callback, and exited
+with code 0 on ordinary window close. No owned Nuvio process or JVM crash report
+remained. The smoke harness now waits for native release before exiting.
+The native CI
+[run 40389885890](https://github.com/Unitron07/Nuvio-ARM64/actions/runs/40389885890)
+passes the full image/audit/packaged smoke sequence, including UIA initialization.
+Hardware decode is not confirmed. The x64 message dispatch and prewarm paths
+remain unchanged.
+
+The bare HTTP-player smoke route must provide the same controls-visibility
+feedback as `PlayerScreenRuntime`: cursor activity and keep-visible events
+reveal chrome, hide events update route state, and snapshots feed playback
+state back to the surface. Missing callbacks caused controls to stay hidden
+after native auto-hide. The smoke route now supplies that feedback and routes
+its close button through the native release barrier. Temporary native window
+stacking/clipping changes and WebView GPU flags were discarded.
+
+Surface validation on October 27 confirms visible pointer controls after
+auto-hide, play/pause with a sustained pause at 11.5 seconds, actual timeline
+drags to 4.95 and 20.01 seconds, fullscreen entry through the overlay and exit
+through F11, and overlay-close native disposal/exit 0 with no remaining process
+or JVM crash report. The stable native bridge is unchanged from `9a7eb670`;
+its complete [CI run 40563371050](https://github.com/Unitron07/Nuvio-ARM64/actions/runs/40563371050)
+passes, as do its ARM64/x64 QuickJS checks and architecture checks. The separate
+Space/K issue was subsequently traced to key-only input, as described below.
+
+### Playback keyboard validation
+
+The page received K and Space keydown/keyup events with `document.hasFocus()`
+true, correct `key` values and an empty `code`. The shortcut handlers required
+physical `code` values. They now accept Space/K `key` values when `code` is
+empty or `Unidentified`, preserving physical mappings and modifier/text-entry
+guards. Both Space phases use the same normalization, retaining tap/hold
+behavior. No AWT/native focus workaround or diagnostic key tracing remains.
+
+On the Surface, K pauses on launch; Space resumes and K pauses in fullscreen,
+after F11 returns to windowed mode, and after switching to another application
+and back. The final focus-return repeat resumed from 5.2 seconds and paused at
+11.9 seconds. Normal close completed native release and exited with code 0;
+no owned app process or JVM crash report remained. Native image audit and
+packaged prerequisite smoke are separate passing checks. The standalone
+`scripts/windows/test-player-shortcuts.mjs` exercises the production functions
+with physical/key-only inputs, modifiers and composition; the ARM64 image CI
+now runs it before building. The earlier complete
+[run 40567574264](https://github.com/Unitron07/Nuvio-ARM64/actions/runs/40567574264)
+also passed before this focused keyboard change.
 
 ## Scope
 

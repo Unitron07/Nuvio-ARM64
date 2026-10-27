@@ -49,6 +49,9 @@ internal object NativePlayerBridge {
      */
     external fun initGtkEarly(): Boolean
 
+    /** Used only by the opt-in packaged Windows runtime smoke command. */
+    external fun verifyWindowsRuntime(): String
+
     external fun create(
         hostViewPtr: Long,
         sourceUrl: String,
@@ -140,6 +143,14 @@ internal object NativePlayerBridge {
     private val controlsPageAssets: ControlsPageAssets by lazy { exportControlsPageAssets() }
 
     fun preloadAsync() {
+        if (DesktopHostOs.current == DesktopHostOs.WINDOWS &&
+            System.getProperty("os.arch").lowercase() in setOf("aarch64", "arm64")
+        ) {
+            // On ARM64, initialize WebView2 after the player has prepared the
+            // UI Automation provider. Loading the bridge itself still happens.
+            log.i { "WebView2 will initialize with the player window on Windows ARM64." }
+            return
+        }
         if (!preloadStarted.compareAndSet(false, true)) return
         Thread {
             val controlsPage = runCatching { controlsPageAssets }
