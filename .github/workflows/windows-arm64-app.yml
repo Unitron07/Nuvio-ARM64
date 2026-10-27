@@ -15,6 +15,8 @@ jobs:
     timeout-minutes: 45
     steps:
       - uses: actions/checkout@v6
+      - name: Verify player shortcut key variants
+        run: node scripts/windows/test-player-shortcuts.mjs
       - uses: actions/setup-java@v5
         with:
           distribution: microsoft

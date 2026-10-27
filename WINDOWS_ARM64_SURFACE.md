@@ -270,8 +270,28 @@ through F11, and overlay-close native disposal/exit 0 with no remaining process
 or JVM crash report. The stable native bridge is unchanged from `9a7eb670`;
 its complete [CI run 40563371050](https://github.com/Unitron07/Nuvio-ARM64/actions/runs/40563371050)
 passes, as do its ARM64/x64 QuickJS checks and architecture checks. The separate
-Space/K playback shortcut focus after fullscreen remains inconsistent and
-needs follow-up; these results establish pointer controls and the F11 route.
+Space/K issue was subsequently traced to key-only input, as described below.
+
+### Playback keyboard validation
+
+The page received K and Space keydown/keyup events with `document.hasFocus()`
+true, correct `key` values and an empty `code`. The shortcut handlers required
+physical `code` values. They now accept Space/K `key` values when `code` is
+empty or `Unidentified`, preserving physical mappings and modifier/text-entry
+guards. Both Space phases use the same normalization, retaining tap/hold
+behavior. No AWT/native focus workaround or diagnostic key tracing remains.
+
+On the Surface, K pauses on launch; Space resumes and K pauses in fullscreen,
+after F11 returns to windowed mode, and after switching to another application
+and back. The final focus-return repeat resumed from 5.2 seconds and paused at
+11.9 seconds. Normal close completed native release and exited with code 0;
+no owned app process or JVM crash report remained. Native image audit and
+packaged prerequisite smoke are separate passing checks. The standalone
+`scripts/windows/test-player-shortcuts.mjs` exercises the production functions
+with physical/key-only inputs, modifiers and composition; the ARM64 image CI
+now runs it before building. The earlier complete
+[run 40567574264](https://github.com/Unitron07/Nuvio-ARM64/actions/runs/40567574264)
+also passed before this focused keyboard change.
 
 ## Scope
 
