@@ -255,6 +255,24 @@ passes the full image/audit/packaged smoke sequence, including UIA initializatio
 Hardware decode is not confirmed. The x64 message dispatch and prewarm paths
 remain unchanged.
 
+The bare HTTP-player smoke route must provide the same controls-visibility
+feedback as `PlayerScreenRuntime`: cursor activity and keep-visible events
+reveal chrome, hide events update route state, and snapshots feed playback
+state back to the surface. Missing callbacks caused controls to stay hidden
+after native auto-hide. The smoke route now supplies that feedback and routes
+its close button through the native release barrier. Temporary native window
+stacking/clipping changes and WebView GPU flags were discarded.
+
+Surface validation on October 27 confirms visible pointer controls after
+auto-hide, play/pause with a sustained pause at 11.5 seconds, actual timeline
+drags to 4.95 and 20.01 seconds, fullscreen entry through the overlay and exit
+through F11, and overlay-close native disposal/exit 0 with no remaining process
+or JVM crash report. The stable native bridge is unchanged from `9a7eb670`;
+its complete [CI run 40563371050](https://github.com/Unitron07/Nuvio-ARM64/actions/runs/40563371050)
+passes, as do its ARM64/x64 QuickJS checks and architecture checks. The separate
+Space/K playback shortcut focus after fullscreen remains inconsistent and
+needs follow-up; these results establish pointer controls and the F11 route.
+
 ## Scope
 
 The requested ARM64 target uses a debrid service and HTTP media streams. Native

@@ -10,6 +10,8 @@ import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.setValue
 import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Modifier
 import org.jetbrains.compose.resources.painterResource
@@ -27,6 +29,8 @@ import com.nuvio.app.features.p2p.P2pStreamingEngine
 import com.nuvio.app.features.plugins.configureDesktopQuickJsLibrary
 import com.nuvio.app.features.player.PlatformPlayerSurface
 import com.nuvio.app.features.player.PlayerEngineController
+import com.nuvio.app.features.player.PlayerControlsState
+import com.nuvio.app.features.player.PlayerControlsAction
 import com.nuvio.app.features.player.desktop.DesktopAppFullscreenController
 import com.nuvio.app.features.player.desktop.DesktopHostOs
 import com.nuvio.app.features.player.desktop.DesktopWindowGeometry
@@ -132,20 +136,21 @@ fun main(args: Array<String>) {
             SentryInitializer.close()
             exitApplication()
         }
+        val requestClose: () -> Unit = {
+            val controller = smokeController[0]
+            if (smokePlayerUrl != null && controller != null) {
+                controller.releaseBeforeNavigation(
+                    onReleased = {
+                        println("PLAYER_SMOKE native release completed")
+                        closeApplication()
+                    },
+                    onReleaseFailed = { System.err.println("PLAYER_SMOKE native release failed: $it") },
+                )
+            } else closeApplication()
+        }
 
         SwingWindow(
-            onCloseRequest = {
-                val controller = smokeController[0]
-                if (smokePlayerUrl != null && controller != null) {
-                    controller.releaseBeforeNavigation(
-                        onReleased = {
-                            println("PLAYER_SMOKE native release completed")
-                            closeApplication()
-                        },
-                        onReleaseFailed = { System.err.println("PLAYER_SMOKE native release failed: $it") },
-                    )
-                } else closeApplication()
-            },
+            onCloseRequest = requestClose,
             title = if (smokePlayerUrl == null) "Nuvio" else "Nuvio Player Smoke",
             state = windowState,
             icon = painterResource(appIconState.selected.transparentPreviewResource),
@@ -240,23 +245,58 @@ fun main(args: Array<String>) {
                 // NuvioTheme provides — the bare smoke harness must supply it too.
                 val smokeReporting = System.getenv("NUVIO_DESKTOP_SMOKE_REPORT") == "1"
                 val lastSmokeProgress = remember { longArrayOf(-1, -1, -1) }
+                // The bare surface delegates chrome visibility to its route,
+                // just as PlayerScreenRuntime does. Without this feedback,
+                // native auto-hide permanently hides the smoke controls.
+                var smokeControls by remember { mutableStateOf(PlayerControlsState()) }
                 NuvioTheme {
                     PlatformPlayerSurface(
                         sourceUrl = smokePlayerUrl,
                         modifier = Modifier.fillMaxSize(),
                         onControllerReady = { smokeController[0] = it },
+                        playerControlsState = smokeControls,
+                        onPlayerControlsEvent = { type, _ ->
+                            when (type) {
+                                "cursorActivity", "keepChromeVisible", "setPlaybackState" -> {
+                                    smokeControls = smokeControls.copy(controlsVisible = true)
+                                    true
+                                }
+                                "hideChrome" -> {
+                                    smokeControls = smokeControls.copy(controlsVisible = false)
+                                    true
+                                }
+                                else -> false
+                            }
+                        },
+                        onPlayerControlsAction = { action ->
+                            when (action) {
+                                PlayerControlsAction.ToggleChrome -> {
+                                    smokeControls = smokeControls.copy(controlsVisible = !smokeControls.controlsVisible)
+                                    true
+                                }
+                                PlayerControlsAction.Back -> { requestClose(); true }
+                                else -> false
+                            }
+                        },
                         onSnapshot = { snapshot ->
+                            smokeControls = smokeControls.copy(
+                                isPlaying = snapshot.isPlaying,
+                                isLoading = snapshot.isLoading,
+                                durationMs = snapshot.durationMs,
+                                positionMs = snapshot.positionMs,
+                                bufferedPositionMs = snapshot.bufferedPositionMs,
+                            )
                             if (smokeReporting) {
                                 val second = snapshot.positionMs / 1000
-                                val dimensions = (snapshot.videoWidth.toLong() shl 32) or snapshot.videoHeight.toLong()
+                                val phase = (if (snapshot.isPlaying) 1L else 0L) or (if (snapshot.isEnded) 2L else 0L)
                                 if (lastSmokeProgress[0] != second || lastSmokeProgress[1] != snapshot.durationMs ||
-                                    lastSmokeProgress[2] != dimensions
+                                    lastSmokeProgress[2] != phase
                                 ) {
                                     lastSmokeProgress[0] = second
                                     lastSmokeProgress[1] = snapshot.durationMs
-                                    lastSmokeProgress[2] = dimensions
+                                    lastSmokeProgress[2] = phase
                                     println("PLAYER_SMOKE positionMs=${snapshot.positionMs} durationMs=${snapshot.durationMs} " +
-                                        "video=${snapshot.videoWidth}x${snapshot.videoHeight} playing=${snapshot.isPlaying} ended=${snapshot.isEnded}")
+                                        "playing=${snapshot.isPlaying} ended=${snapshot.isEnded}")
                                 }
                             }
                         },

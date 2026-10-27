@@ -1504,7 +1504,6 @@ public:
 private:
     HWND hostHwnd = nullptr;
     HWND containerHwnd = nullptr;
-    HWND videoHwnd = nullptr;
     HWND messageHwnd = nullptr;
     DWORD uiThreadId = 0;
     bool didOleInitialize = false;
@@ -1633,11 +1632,7 @@ private:
             0,
             kContainerWindowClass,
             L"",
-            WS_CHILD | WS_VISIBLE | WS_CLIPSIBLINGS
-#if defined(_M_ARM64)
-                | WS_CLIPCHILDREN
-#endif
-            ,
+            WS_CHILD | WS_VISIBLE | WS_CLIPSIBLINGS,
             0,
             0,
             width,
@@ -1651,15 +1646,6 @@ private:
             throw std::runtime_error("Unable to create native player container window.");
         }
 
-#if defined(_M_ARM64)
-        // mpv creates/reorders its own child asynchronously after loadfile.
-        // Keep that child in a separate sibling subtree below WebView2, so
-        // decoder startup cannot cover the controls or steal their hit tests.
-        videoHwnd = CreateWindowExW(0, L"STATIC", L"", WS_CHILD | WS_VISIBLE,
-            0, 0, width, height, containerHwnd, nullptr, gModule, nullptr);
-        if (!videoHwnd) throw std::runtime_error("Unable to create ARM64 video host window.");
-        SetWindowPos(videoHwnd, HWND_BOTTOM, 0, 0, width, height, SWP_NOACTIVATE);
-#endif
         startWebView(controlsUrl);
         startMpv(sourceUrl, headerLines, playWhenReady, initialPositionMs, decoderPriority, nvidiaRtxSuperResolutionEnabled);
         layoutNativeSubviews();
@@ -1689,7 +1675,6 @@ private:
         if (containerHwnd) {
             DestroyWindow(containerHwnd);
             containerHwnd = nullptr;
-            videoHwnd = nullptr;
         }
         if (messageHwnd) {
             HWND hwnd = messageHwnd;
@@ -1922,7 +1907,7 @@ private:
                 setMpvOptionStringLocked("gpu-shader-cache-dir", shaderCacheDirectory.c_str());
             }
 
-            int64_t wid = (int64_t)(intptr_t)(videoHwnd ? videoHwnd : containerHwnd);
+            int64_t wid = (int64_t)(intptr_t)containerHwnd;
             int widResult = api.setOption(mpv, "wid", MPV_FORMAT_INT64, &wid);
             if (widResult < 0) {
                 throw std::runtime_error(std::string("mpv wid option failed: ") + api.errorText(widResult));
@@ -1987,9 +1972,6 @@ private:
         LONG height = std::max<LONG>(1, bounds.bottom - bounds.top);
         if (containerHwnd) {
             SetWindowPos(containerHwnd, HWND_TOP, 0, 0, width, height, SWP_SHOWWINDOW | SWP_NOACTIVATE | SWP_NOCOPYBITS);
-        }
-        if (videoHwnd) {
-            SetWindowPos(videoHwnd, HWND_BOTTOM, 0, 0, width, height, SWP_NOACTIVATE | SWP_NOCOPYBITS);
         }
         if (controller) {
             RECT webBounds = {0, 0, width, height};
