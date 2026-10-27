@@ -1633,7 +1633,11 @@ private:
             0,
             kContainerWindowClass,
             L"",
-            WS_CHILD | WS_VISIBLE | WS_CLIPSIBLINGS,
+            WS_CHILD | WS_VISIBLE | WS_CLIPSIBLINGS
+#if defined(_M_ARM64)
+                | WS_CLIPCHILDREN
+#endif
+            ,
             0,
             0,
             width,
@@ -1651,7 +1655,7 @@ private:
         // mpv creates/reorders its own child asynchronously after loadfile.
         // Keep that child in a separate sibling subtree below WebView2, so
         // decoder startup cannot cover the controls or steal their hit tests.
-        videoHwnd = CreateWindowExW(0, L"STATIC", L"", WS_CHILD | WS_VISIBLE | WS_CLIPSIBLINGS,
+        videoHwnd = CreateWindowExW(0, L"STATIC", L"", WS_CHILD | WS_VISIBLE,
             0, 0, width, height, containerHwnd, nullptr, gModule, nullptr);
         if (!videoHwnd) throw std::runtime_error("Unable to create ARM64 video host window.");
         SetWindowPos(videoHwnd, HWND_BOTTOM, 0, 0, width, height, SWP_NOACTIVATE);

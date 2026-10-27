@@ -1,0 +1,45 @@
+name: Windows ARM64 bridge compile
+on:
+  workflow_dispatch:
+  pull_request:
+    paths:
+      - composeApp/src/desktopMain/native/windows/**
+      - .github/workflows/windows-arm64-bridge.yml
+permissions:
+  contents: read
+jobs:
+  bridge:
+    runs-on: windows-11-arm
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-java@v5
+        with:
+          distribution: microsoft
+          java-version: '21'
+          architecture: aarch64
+      - name: Acquire pinned WebView2 SDK
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force build | Out-Null
+          Invoke-WebRequest 'https://api.nuget.org/v3-flatcontainer/microsoft.web.webview2/1.0.4078.44/microsoft.web.webview2.1.0.4078.44.nupkg' -OutFile build/webview2.zip
+          if ((Get-FileHash build/webview2.zip -Algorithm SHA256).Hash -ne 'dc4d1d9168df26b830398303e50210b6e1729f6ce5a7ac69d2c766852f489962') { throw 'WebView2 SDK hash mismatch' }
+          Expand-Archive build/webview2.zip build/webview2
+      - name: Compile bridge independently of media runtime tests
+        shell: pwsh
+        run: |
+          New-Item -ItemType File -Force local.properties | Out-Null
+          $vswhere = "${env:ProgramFiles(x86)}/Microsoft Visual Studio/Installer/vswhere.exe"
+          $vcvars = & $vswhere -latest -products '*' -find 'VC/Auxiliary/Build/vcvarsarm64.bat' | Select-Object -First 1
+          # This job checks compilation only. The full image workflow retains
+          # prerequisite validation, dependency closure and runtime tests.
+          ./gradlew.bat :composeApp:buildWindowsPlayerBridge -x verifyWindowsArm64Inputs `
+            "-Pnuvio.windows.vcvars.path=$vcvars" "-Pnuvio.webview2.dir=$pwd/build/webview2" `
+            '-Dorg.gradle.jvmargs=-Xmx6g' --max-workers=2 --no-configuration-cache --no-daemon --console=plain
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+      - uses: actions/upload-artifact@v6
+        with:
+          name: windows-arm64-player-bridge-fast
+          path: composeApp/build/native/windows/arm64/player_bridge.dll
+          if-no-files-found: error
+          retention-days: 7
