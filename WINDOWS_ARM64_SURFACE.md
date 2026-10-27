@@ -1,8 +1,8 @@
 # Windows ARM64 and Surface Pro 11
 
 Status: native Windows ARM64 bridge and development application image built;
-packaged native prerequisite smoke passed. Full UI/playback and installer
-validation remain separate gates.
+packaged native prerequisite smoke and local welcome-screen rendering passed.
+Embedded player, authenticated services and installer validation remain gates.
 Baseline: [NuvioMedia/NuvioDesktop Dev](https://github.com/NuvioMedia/NuvioDesktop/tree/5e18596aa919a6a4e7b6cdee7f90dfaabbf71b00), commit `5e18596aa919a6a4e7b6cdee7f90dfaabbf71b00`.
 Inspection: October 24–26, 2026.
 
@@ -211,6 +211,49 @@ JARs. Its actual launcher reports ARM64 JDK 21.0.11, successful JNA/Skiko raster
 initialization, packaged QuickJS evaluation/disposal, and all five JNI libmpv
 initialization/destruction cycles. This is the first verified development image,
 not an installer or proof of full UI/GPU/provider playback.
+
+Normal Surface startup subsequently exposed a defect in the initial native
+auditor: .NET ZIP Update mode corrupted Java-compatible local headers even for
+untouched JARs. The initial CI images above are diagnostic-only. Commit
+`353ddbfd40b26c753805a31f25cae4ec5d540ada` switches inspection to read-only,
+leaves unaffected JAR bytes intact, and copies retained entries into a fresh ZIP
+only when native resources need removal. Regression tests compile a real Java
+class, create JARs with Java's tool, assert unchanged JAR hashes and load classes
+from both unchanged and pruned JARs. Packaged smoke additionally initializes
+SLF4J and Ktor content negotiation. The
+[corrected CI run 40384081971](https://github.com/Unitron07/Nuvio-ARM64/actions/runs/40384081971)
+passes the complete image/audit/expanded startup sequence.
+
+A clean local image built with ARM64 JDK 21.0.12.1+1 and the verified MSVC bridge
+passes the expanded packaged smoke. Skiko renders the welcome screen on this
+Surface, with an isolated app/WebView2 profile and no provider credentials.
+The empty build configuration uses `https://localhost` for Supabase, so account
+and catalog data are unavailable; this is a configuration gate, not a successful
+provider test. ARM64 skips optional hidden-window WebView2 prewarming after a
+native COM exception `0x8001010d` was reproduced during normal startup. Loading
+the bridge itself remains enabled; WebView2 initializes with a player window.
+
+The embedded player initially reproduced `0x8001010d` before WebView2 controller
+creation completed. Native stack symbols identify UIAutomationCore provider
+initialization during synchronous accessibility handling. The ARM64 bridge now
+initializes the UIA provider on its ordinary STA before creating WebView2, using
+the documented `UiaReturnRawElementProvider(hwnd, 0, 0, nullptr)` cleanup call
+from a private window's WM_DESTROY handler. It preserves accessibility and normal
+exception handling. Experimental message-dispatch changes were reverted.
+
+On October 27, 2026, the compiled native fix rendered the 30-second generated
+loopback HTTP video without the diagnostic Java agent. UI Automation queried
+the embedded controls and sought backward to 5.01 seconds and forward to 20.01
+seconds; the video image and time display changed accordingly. A rebuilt image
+using ARM64 JDK 21.0.12.1+1 repeated both seeks, resumed advancing, completed
+`pre-navigation dispose` and the explicit native release callback, and exited
+with code 0 on ordinary window close. No owned Nuvio process or JVM crash report
+remained. The smoke harness now waits for native release before exiting.
+The native CI
+[run 40389885890](https://github.com/Unitron07/Nuvio-ARM64/actions/runs/40389885890)
+passes the full image/audit/packaged smoke sequence, including UIA initialization.
+Hardware decode is not confirmed. The x64 message dispatch and prewarm paths
+remain unchanged.
 
 ## Scope
 

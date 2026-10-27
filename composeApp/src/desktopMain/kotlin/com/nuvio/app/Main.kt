@@ -26,6 +26,7 @@ import com.nuvio.app.features.discordrpc.DiscordPresenceManager
 import com.nuvio.app.features.p2p.P2pStreamingEngine
 import com.nuvio.app.features.plugins.configureDesktopQuickJsLibrary
 import com.nuvio.app.features.player.PlatformPlayerSurface
+import com.nuvio.app.features.player.PlayerEngineController
 import com.nuvio.app.features.player.desktop.DesktopAppFullscreenController
 import com.nuvio.app.features.player.desktop.DesktopHostOs
 import com.nuvio.app.features.player.desktop.DesktopWindowGeometry
@@ -124,13 +125,26 @@ fun main(args: Array<String>) {
             placement = initialPlacement,
         )
         val fullscreenController = remember { DesktopAppFullscreenController() }
+        val smokeController = remember { arrayOfNulls<PlayerEngineController>(1) }
+        val closeApplication = {
+            P2pStreamingEngine.shutdown()
+            DiscordPresenceManager.shutdown()
+            SentryInitializer.close()
+            exitApplication()
+        }
 
         SwingWindow(
             onCloseRequest = {
-                P2pStreamingEngine.shutdown()
-                DiscordPresenceManager.shutdown()
-                SentryInitializer.close()
-                exitApplication()
+                val controller = smokeController[0]
+                if (smokePlayerUrl != null && controller != null) {
+                    controller.releaseBeforeNavigation(
+                        onReleased = {
+                            println("PLAYER_SMOKE native release completed")
+                            closeApplication()
+                        },
+                        onReleaseFailed = { System.err.println("PLAYER_SMOKE native release failed: $it") },
+                    )
+                } else closeApplication()
             },
             title = if (smokePlayerUrl == null) "Nuvio" else "Nuvio Player Smoke",
             state = windowState,
@@ -230,7 +244,7 @@ fun main(args: Array<String>) {
                     PlatformPlayerSurface(
                         sourceUrl = smokePlayerUrl,
                         modifier = Modifier.fillMaxSize(),
-                        onControllerReady = {},
+                        onControllerReady = { smokeController[0] = it },
                         onSnapshot = { snapshot ->
                             if (smokeReporting) {
                                 val second = snapshot.positionMs / 1000
