@@ -13,6 +13,13 @@ if (-not [Runtime.InteropServices.RuntimeInformation]::OSArchitecture.Equals([Ru
 }
 $launcher = @(Get-ChildItem -LiteralPath $image -File -Filter '*.exe')
 if ($launcher.Count -ne 1) { throw 'ImageDirectory must contain exactly one app launcher.' }
+$imageManifestPath = Join-Path $image 'STAGE3_IMAGE.json'
+if (-not (Test-Path -LiteralPath $imageManifestPath)) { throw 'Use a Stage 3 CI image with STAGE3_IMAGE.json. Older images lack native test-data isolation.' }
+$imageManifest = Get-Content -LiteralPath $imageManifestPath -Raw | ConvertFrom-Json
+if ($imageManifest.schema -ne 'nuvio-stage3-image-v1' -or $imageManifest.sourceCommit -notmatch '^[a-f0-9]{40}$' -or
+    -not $imageManifest.nativeTestDataIsolation -or -not $imageManifest.typedHttpHeaders) { throw 'Image does not declare the required Stage 3 isolation/header support.' }
+$launcherHash = (Get-FileHash -LiteralPath $launcher[0].FullName -Algorithm SHA256).Hash
+if ($imageManifest.launcherSha256 -ne $launcherHash) { throw 'Launcher does not match Stage 3 image manifest.' }
 $manifestPath = Join-Path $run 'results.json'
 if (Test-Path -LiteralPath $run) {
     if (-not $Resume -or -not (Test-Path -LiteralPath $manifestPath)) { throw 'Use a new RunDirectory, or -Resume with an existing Stage 3 run.' }
@@ -67,7 +74,7 @@ $events = @(Get-WinEvent -FilterHashtable @{LogName='Application'; Id=1000,1001,
     ForEach-Object { @{id=$_.Id; timeUtc=$_.TimeCreated.ToUniversalTime().ToString('o'); provider=$_.ProviderName} })
 [ordered]@{schema='nuvio-stage3-session-v1'; startedUtc=$started.ToString('o'); endedUtc=[DateTime]::UtcNow.ToString('o');
     mode=$(if ($NativeSmoke) {'native-prerequisites'} else {'application'}); exitCode=$process.ExitCode;
-    launcherSha256=(Get-FileHash -LiteralPath $launcher[0].FullName -Algorithm SHA256).Hash;
+    launcherSha256=$launcherHash; sourceCommit=$imageManifest.sourceCommit;
     osBuild=[Environment]::OSVersion.Version.ToString(); osArchitecture='Arm64';
     privateCrashReportCount=$crashes.Count; relevantEventSummaries=$events;
     validation='Process exit is diagnostic evidence; acceptance statuses require owner observations.'} |

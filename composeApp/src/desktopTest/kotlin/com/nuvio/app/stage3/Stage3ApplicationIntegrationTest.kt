@@ -11,6 +11,21 @@ import kotlinx.coroutines.flow.first
 import kotlin.test.*
 
 class Stage3ApplicationIntegrationTest {
+    @Test fun trustedHttpsAddonAndQuickJsFetchPreserveRedirectHeaders() = runBlocking {
+        Stage3Fixture(tls = true).use { fixture ->
+            val manifestUrl = "${fixture.baseUrl}/manifest.json"
+            val manifest = AddonManifestParser.parse(manifestUrl, fetchAddonResponseText(manifestUrl))
+            assertEquals("org.nuvio.stage3.fixture", manifest.id)
+            val streams = PluginRuntime.executePlugin(fixture.fixture("scraper.js"), "stage3:video", "movie", null, null, "stage3-https")
+            val stream = streams.first()
+            val result = httpRequestRaw("GET", stream.url, stream.headers.orEmpty(), "")
+            assertEquals(200, result.status)
+            assertEquals("authorized-fixture-bytes", result.body)
+            assertEquals("Bearer fixture-only", fixture.requests.last().headers["authorization"])
+            assertEquals("fixture=one%2Btwo&session=local", fixture.requests.last().query)
+        }
+    }
+
     @Test fun installedAddonRegistersReloadsAndRemainsUsableAfterManifestFailure() = runBlocking {
         Stage3Fixture().use { fixture ->
             val manifestUrl = "${fixture.baseUrl}/manifest.json"

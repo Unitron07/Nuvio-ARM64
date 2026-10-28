@@ -2,16 +2,31 @@ package com.nuvio.app.stage3
 
 import com.sun.net.httpserver.HttpExchange
 import com.sun.net.httpserver.HttpServer
+import com.sun.net.httpserver.HttpsServer
+import com.sun.net.httpserver.HttpsConfigurator
+import java.io.FileInputStream
+import java.security.KeyStore
+import javax.net.ssl.KeyManagerFactory
+import javax.net.ssl.SSLContext
 import java.net.InetSocketAddress
 import java.util.Collections
 import java.util.concurrent.Executors
 
-internal class Stage3Fixture : AutoCloseable {
+internal class Stage3Fixture(private val tls: Boolean = false) : AutoCloseable {
     data class Request(val method: String, val path: String, val query: String?, val headers: Map<String, String>, val body: String)
     val requests = Collections.synchronizedList(mutableListOf<Request>())
     private val executor = Executors.newCachedThreadPool()
-    private val server = HttpServer.create(InetSocketAddress("127.0.0.1", 0), 0)
-    val baseUrl get() = "http://127.0.0.1:${server.address.port}"
+    private val server = if (tls) {
+        val store = KeyStore.getInstance("PKCS12").apply {
+            FileInputStream(System.getProperty("stage3.test.keyStore")).use { load(it, "fixture-only".toCharArray()) }
+        }
+        val keys = KeyManagerFactory.getInstance(KeyManagerFactory.getDefaultAlgorithm()).apply {
+            init(store, "fixture-only".toCharArray())
+        }
+        val context = SSLContext.getInstance("TLS").apply { init(keys.keyManagers, null, null) }
+        HttpsServer.create(InetSocketAddress("127.0.0.1", 0), 0).apply { httpsConfigurator = HttpsConfigurator(context) }
+    } else HttpServer.create(InetSocketAddress("127.0.0.1", 0), 0)
+    val baseUrl get() = "${if (tls) "https" else "http"}://127.0.0.1:${server.address.port}"
     @Volatile var providerStatus = 200
     @Volatile var unrestrictStatus = 200
     @Volatile var manifestStatus = 200

@@ -52,6 +52,14 @@ jobs:
           & "$env:JAVA_HOME/bin/java.exe" -cp scripts/windows/quickjs-smoke/build/jna/jna-5.19.1.jar `
             scripts/windows/MpvHttpSmoke.java build/windows-media-arm64/runtime/libmpv-2.dll build/fixture.avi
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+      - name: Decode protected HTTPS with verified fixture certificate
+        shell: pwsh
+        run: |
+          ./scripts/windows/stage3/Make-TestTls.ps1 -OutputDirectory build/native-https-fixture
+          & "$env:JAVA_HOME/bin/java.exe" -cp scripts/windows/quickjs-smoke/build/jna/jna-5.19.1.jar `
+            scripts/windows/MpvHttpSmoke.java build/windows-media-arm64/runtime/libmpv-2.dll build/fixture.avi `
+            build/native-https-fixture/fixture.p12 build/native-https-fixture/fixture-ca.pem
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
       - name: Verify portable native dependency closure
         shell: pwsh
         run: |
@@ -128,6 +136,17 @@ jobs:
           if ((Get-Content build/packaged-smoke.log -Raw) -notmatch 'PASS: native prerequisite smoke') {
             throw 'Launcher did not report completed native prerequisite smoke.'
           }
+      - name: Identify the Stage 3 owner image
+        shell: pwsh
+        run: |
+          $image=Get-ChildItem composeApp/build/compose/binaries/main/app -Directory | Select-Object -First 1
+          $launcher=Get-ChildItem $image.FullName -File -Filter '*.exe' | Select-Object -First 1
+          [ordered]@{schema='nuvio-stage3-image-v1'; sourceCommit='${{ github.event.pull_request.head.sha || github.sha }}';
+            nativeTestDataIsolation=$true; typedHttpHeaders=$true;
+            launcherSha256=(Get-FileHash -LiteralPath $launcher.FullName -Algorithm SHA256).Hash;
+            bridgeSha256=(Get-FileHash composeApp/build/native/windows/arm64/player_bridge.dll -Algorithm SHA256).Hash;
+            validation='Build, architecture audit and native prerequisites only; UI/provider acceptance pending.'} |
+            ConvertTo-Json | Set-Content (Join-Path $image.FullName 'STAGE3_IMAGE.json')
       - name: Record development artifact status
         if: always()
         shell: pwsh

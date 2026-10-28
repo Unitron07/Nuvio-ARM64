@@ -65,18 +65,23 @@ is a different persistence path and still needs a configured owner account.
 ## Automated tests
 
 Local October 27 evidence: native Microsoft ARM64 JDK 21.0.12.1+1 compiled the
-desktop application/tests and passed **97 tests in 17 suites, zero failures,
-errors or skips**. Seven tests are new Stage 3 cases; the selection also includes
+desktop application/tests and passed **99 tests in 17 suites, zero failures,
+errors or skips**. Nine tests are new Stage 3 cases; the selection also includes
 existing plugin concurrency, teardown, debrid and playback-state regressions.
 The fixture server self-test, owner-archive privacy test, PowerShell parser checks
-and `git diff --check` pass. Native `MpvHttpSmoke` passes three protected redirect/
-header/decode/pause/seek/resume/stop/destruction cycles and DLL unload using the
+and `git diff --check` pass. Real desktop HTTP/QuickJS requests pass a trusted
+loopback HTTPS test; separate fresh JVMs restore addon/plugin configuration,
+settings, progress and synthetic provider authentication. Native `MpvHttpSmoke`
+passes three protected redirect/header/decode/pause/seek/resume/stop/destruction
+cycles for each of HTTP and verified HTTPS, followed by DLL unload, using the
 existing pinned ARM64 libmpv (SHA256
 `f90cee7e3dbb0a12fbfa6b95af1fb2bb22dbfebf8422efc0324918ee75661850`).
 This local environment has no MSVC/Windows SDK installation; the changed C++
 bridge must be compiled by native CI. No new image/UI playback is claimed from
-these tests. The first test compilation raced a subsequent source edit and was
-rerun successfully; native header failure was reproduced before the API fix.
+these tests. During development, the fresh-JVM test exposed classloader and
+Windows command-line-length assumptions; it now uses an explicit classpath file
+and Java argument files. The full final rerun passes. Native header failure was
+reproduced before the API fix.
 
 With a native matching JDK 21, Node.js, the existing source-build prerequisites
 and a matching QuickJS-KT 1.0.15 JNI DLL:
@@ -113,7 +118,9 @@ mock tests but does not configure Nuvio's real account and catalog services.
 The extended `MpvHttpSmoke.java` uses generated video, a protected same-origin
 redirect, encoded query parameters, authorization/user-agent/referer and comma/
 backslash headers. It checks decode, pause state, seek/resume, EOF and stop through
-three player creation/destruction cycles followed by DLL unload. It uses null
+three player creation/destruction cycles followed by DLL unload. Optional
+PKCS12/CA arguments enable HTTPS with certificate verification, generated using
+`Make-TestTls.ps1`; no system trust store is modified. It uses null
 video/audio outputs, so it does not establish rendering, audio or UI navigation.
 Run it with the same JNA/libmpv inputs as the native-image workflow. The ARM64
 Lua-disable preset is retained without weakening normal destruction.
@@ -122,7 +129,9 @@ Lua-disable preset is retained without weakening normal destruction.
 
 Use the Stage 3 branch's **new** passing development image, not an older Stage 2
 image (the old bridge lacks test-data isolation and the header fix). Check the
-source SHA and status in its development evidence artifact. No installer is needed.
+source SHA and status in its development evidence artifact. The launcher requires
+`STAGE3_IMAGE.json` and checks the launcher hash to reject old images lacking
+native test-data isolation. No installer is needed.
 Use PowerShell 7 and Node.js. Keep a native ARM64 JDK for source tests.
 
 1. Download the image and owner tools artifacts for the same commit and extract
@@ -208,7 +217,7 @@ retained in the ARM64 document, not promoted into Stage 3 results.
 | URLs and headers reach libmpv | Native API fixture passes locally; new JNI bridge/app route pending |
 | Authorized HTTP/HTTPS through actual UI | Pending owner, both protocols required |
 | Navigation and repeated playback | Pending owner: browse → title → play → seek/pause → back → repeat 10 times → close |
-| Settings and user state persist | Automated disk reload/corruption pass; real process/UI restart pending; secure credential storage gap above |
+| Settings and user state persist | Automated disk reload/corruption and fresh-JVM restart pass; full UI/cloud restart pending; secure credential storage gap above |
 | Provider automated mocks | Pass locally: existing Real-Debrid resolver through loopback HTTP; no account required |
 | Real provider validation documented | Procedure implemented; actual authentication/playback/restart/logout pending owner |
 | Existing ARM64 native CI green | Pending branch CI; check new image and native workflows |

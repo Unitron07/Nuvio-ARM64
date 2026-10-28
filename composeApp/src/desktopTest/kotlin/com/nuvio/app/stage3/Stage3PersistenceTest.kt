@@ -7,9 +7,37 @@ import com.nuvio.app.features.debrid.DebridSettingsStorage
 import com.nuvio.app.features.settings.ThemeSettingsStorage
 import com.nuvio.app.features.watchprogress.WatchProgressStorage
 import java.nio.file.Files
+import java.io.File
+import java.util.concurrent.TimeUnit
 import kotlin.test.*
 
 class Stage3PersistenceTest {
+    @Test fun separateJvmsRestorePersistedAddonSettingsProgressAndSyntheticAuthentication() {
+        val classpath = File(checkNotNull(System.getProperty("stage3.test.classpathFile"))).readText()
+        val executable = if (System.getProperty("os.name").contains("win", true)) "java.exe" else "java"
+        val java = File(System.getProperty("java.home"), "bin/$executable").absolutePath
+        for (mode in listOf("write", "read")) {
+            // An argument file avoids Windows' command-line length limit for the
+            // full application dependency classpath, without invoking a shell.
+            val arguments = Files.createTempFile("stage3-restart-", ".args")
+            try {
+                val values = listOf("-Duser.home=${System.getProperty("user.home")}", "-cp", classpath,
+                    Stage3PersistenceProbe::class.java.name, mode)
+                Files.writeString(arguments, values.joinToString("\n") { "\"${it.replace("\\", "\\\\").replace("\"", "\\\"")}\"" })
+                val process = ProcessBuilder(java, "@${arguments.toAbsolutePath()}").redirectErrorStream(true).start()
+                if (!process.waitFor(30, TimeUnit.SECONDS)) {
+                    process.destroyForcibly()
+                    fail("Restart probe timed out: $mode")
+                }
+                val output = process.inputStream.bufferedReader().readText()
+                assertEquals(0, process.exitValue(), output)
+                assertTrue(output.contains("PASS: process $mode"), output)
+            } finally {
+                Files.deleteIfExists(arguments)
+            }
+        }
+    }
+
     @Test fun installedAddonsPluginConfigurationSettingsProgressAndSyntheticCredentialsReload() {
         // The Gradle desktopTest task supplies a dedicated profile before this JVM starts.
         assertTrue(DesktopStorage.rootDir.toString().contains("stage3-test-profile"))
@@ -57,5 +85,26 @@ class Stage3PersistenceTest {
             Files.deleteIfExists(file)
             Files.deleteIfExists(directory)
         }
+    }
+}
+
+internal object Stage3PersistenceProbe {
+    @JvmStatic fun main(args: Array<String>) {
+        check(DesktopStorage.rootDir.toString().contains("stage3-test-profile"))
+        val addon = "http://127.0.0.1:19876/manifest.json?fixture=restart"
+        if (args.single() == "write") {
+            AddonStorage.saveInstalledAddonUrls(73, listOf(addon))
+            PluginStorage.saveScraperSettings("stage3-process-restart", "{\"enabled\":true}")
+            WatchProgressStorage.savePayload(73, "{\"positionMs\":12500}")
+            ThemeSettingsStorage.saveSelectedTheme("dark")
+            DebridSettingsStorage.saveRealDebridApiKey("synthetic-process-fixture-only")
+        } else {
+            check(AddonStorage.loadInstalledAddonUrls(73) == listOf(addon))
+            check(PluginStorage.loadScraperSettings("stage3-process-restart") == "{\"enabled\":true}")
+            check(WatchProgressStorage.loadPayload(73) == "{\"positionMs\":12500}")
+            check(ThemeSettingsStorage.loadSelectedTheme() == "dark")
+            check(DebridSettingsStorage.loadRealDebridApiKey() == "synthetic-process-fixture-only")
+        }
+        println("PASS: process ${args.single()}")
     }
 }

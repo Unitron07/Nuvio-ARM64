@@ -1,6 +1,10 @@
 import com.sun.jna.*;
 import com.sun.jna.ptr.DoubleByReference;
 import com.sun.net.httpserver.HttpServer;
+import com.sun.net.httpserver.HttpsServer;
+import com.sun.net.httpserver.HttpsConfigurator;
+import javax.net.ssl.*;
+import java.security.KeyStore;
 import java.net.*;
 import java.nio.file.*;
 import java.util.*;
@@ -14,8 +18,18 @@ public class MpvHttpSmoke {
     AtomicInteger requests = new AtomicInteger();
     AtomicInteger rejected = new AtomicInteger();
     AtomicInteger redirects = new AtomicInteger();
-    HttpServer server = HttpServer.create(new InetSocketAddress(InetAddress.getLoopbackAddress(), 0), 0);
-    String base = "http://127.0.0.1:" + server.getAddress().getPort();
+    boolean tls = args.length == 4;
+    HttpServer server;
+    if (tls) {
+      KeyStore store = KeyStore.getInstance("PKCS12");
+      try (var input = Files.newInputStream(Path.of(args[2]))) { store.load(input, "fixture-only".toCharArray()); }
+      KeyManagerFactory keys = KeyManagerFactory.getInstance(KeyManagerFactory.getDefaultAlgorithm());
+      keys.init(store, "fixture-only".toCharArray());
+      SSLContext context = SSLContext.getInstance("TLS"); context.init(keys.getKeyManagers(), null, null);
+      HttpsServer secure = HttpsServer.create(new InetSocketAddress("127.0.0.1", 0), 0);
+      secure.setHttpsConfigurator(new HttpsConfigurator(context)); server = secure;
+    } else server = HttpServer.create(new InetSocketAddress("127.0.0.1", 0), 0);
+    String base = (tls ? "https" : "http") + "://127.0.0.1:" + server.getAddress().getPort();
     String query = "fixture=one%2Btwo&session=local";
     server.createContext("/redirect", exchange -> {
       redirects.incrementAndGet();
@@ -66,6 +80,7 @@ public class MpvHttpSmoke {
             "d3d11-exclusive-fs", "hwdec"})
           set(lib, handle, option, "no");
         set(lib, handle, "vo", "null"); set(lib, handle, "ao", "null");
+        if (tls) { set(lib, handle, "tls-verify", "yes"); set(lib, handle, "tls-ca-file", Path.of(args[3]).toAbsolutePath().toString()); }
         setHeaders(lib, handle, new String[]{"Authorization: Bearer fixture-only", "User-Agent: Nuvio-Stage3-Fixture",
             "Referer: " + base + "/", "X-Fixture: comma,backslash\\value"});
         set(lib, handle, "terminal", "yes");
@@ -103,12 +118,12 @@ public class MpvHttpSmoke {
         }
         if (!loaded || !decoded || !seeked || !eof || requests.get() == 0 || redirects.get() == 0 || rejected.get() != 0 || maxPosition < 1.0)
           throw new IllegalStateException("loaded="+loaded+" decoded="+decoded+" seek="+seeked+" eof="+eof+" requests="+requests+" time="+maxPosition);
-        System.out.println("PASS: ARM64 HTTP video decode, seek and EOF; requests="+requests+" maxPosition="+maxPosition);
+        System.out.println("PASS: ARM64 " + (tls ? "HTTPS" : "HTTP") + " protected redirect, headers, decode, pause, seek, resume and EOF; requests="+requests+" maxPosition="+maxPosition);
         check(lib.getFunction("mpv_command").invokeInt(new Object[]{handle,new StringArray(new String[]{"stop"})}), "stop");
       } finally { lib.getFunction("mpv_terminate_destroy").invokeVoid(new Object[]{handle}); }
       }
     } finally { server.stop(0); }
-    System.out.println("PASS: player destruction and DLL unload after HTTP decoding");
+    System.out.println("PASS: player destruction and DLL unload after " + (tls ? "HTTPS" : "HTTP") + " decoding");
   }
   static void set(NativeLibrary lib, Pointer handle, String key, String value) {
     check(lib.getFunction("mpv_set_option_string").invokeInt(new Object[]{handle,key,value}), "option " + key);

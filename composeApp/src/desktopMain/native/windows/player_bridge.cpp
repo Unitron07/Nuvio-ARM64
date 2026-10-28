@@ -65,6 +65,8 @@ typedef struct mpv_node_list {
     mpv_node *values;
     char **keys;
 } mpv_node_list;
+static_assert(sizeof(mpv_node) == 16, "libmpv node ABI must match the 64-bit client API");
+static_assert(sizeof(mpv_node_list) == 24, "libmpv node list ABI must match the 64-bit client API");
 
 typedef enum mpv_event_id {
     MPV_EVENT_NONE = 0,
@@ -504,14 +506,14 @@ std::wstring localAppDataDirectory(const wchar_t *name) {
         }
         directory = testPath.data();
     } else {
-    PWSTR localAppData = nullptr;
-    HRESULT result = SHGetKnownFolderPath(FOLDERID_LocalAppData, KF_FLAG_CREATE, nullptr, &localAppData);
-    if (FAILED(result) || !localAppData) {
-        if (localAppData) CoTaskMemFree(localAppData);
-        throw std::runtime_error(hresultMessage("SHGetKnownFolderPath", result));
-    }
-    directory = localAppData;
-    CoTaskMemFree(localAppData);
+        PWSTR localAppData = nullptr;
+        HRESULT result = SHGetKnownFolderPath(FOLDERID_LocalAppData, KF_FLAG_CREATE, nullptr, &localAppData);
+        if (FAILED(result) || !localAppData) {
+            if (localAppData) CoTaskMemFree(localAppData);
+            throw std::runtime_error(hresultMessage("SHGetKnownFolderPath", result));
+        }
+        directory = localAppData;
+        CoTaskMemFree(localAppData);
     }
     directory += L"\\Nuvio\\";
     directory += name;
