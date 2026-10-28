@@ -161,8 +161,12 @@ Use PowerShell 7 and Node.js. Keep a native ARM64 JDK for source tests.
    ```
 
    Each launch audits the image read-only, uses dedicated roaming/local/WebView2/
-   native directories, captures private stdout/stderr/JVM crash reports, waits for
+   native directories, captures private JVM crash reports, waits for
    normal close and records exit/crash/event summaries. It never kills an app.
+   Console output is discarded by default because upstream addon logs can contain
+   configured URLs. `-FixtureLogs` enables private stdout/stderr only for synthetic
+   local fixture sessions; never enable it when testing real credentials. Native
+   prerequisite mode captures only its account-free runtime diagnostics.
    Test sessions may intentionally display a Nuvio window. Architecture failures
    stop the launch; no foreign native resource is silently pruned by this tool.
 4. Complete the application checklists below. In Addons install

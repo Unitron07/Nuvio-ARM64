@@ -2,7 +2,8 @@ param(
     [Parameter(Mandatory=$true)][string]$ImageDirectory,
     [Parameter(Mandatory=$true)][string]$RunDirectory,
     [switch]$Resume,
-    [switch]$NativeSmoke
+    [switch]$NativeSmoke,
+    [switch]$FixtureLogs
 )
 $ErrorActionPreference = 'Stop'
 Set-StrictMode -Version Latest
@@ -51,22 +52,46 @@ $overrides = @{
     NUVIO_DESKTOP_SMOKE_PLAYER_URL=$null; NUVIO_DESKTOP_SMOKE_REPORT=$null
 }
 $started = [DateTime]::UtcNow
+$stdoutTarget = $null
+$stderrTarget = $null
 try {
     foreach ($name in $overrides.Keys) {
         $saved[$name] = [Environment]::GetEnvironmentVariable($name, 'Process')
         [Environment]::SetEnvironmentVariable($name, $overrides[$name], 'Process')
     }
     New-Item -ItemType Directory -Force -Path $env:APPDATA,$env:LOCALAPPDATA,$env:WEBVIEW2_USER_DATA_FOLDER | Out-Null
-    $arguments = @{FilePath=$launcher[0].FullName; WorkingDirectory=$image; PassThru=$true;
-        RedirectStandardOutput=(Join-Path $private "$session.stdout.log");
-        RedirectStandardError=(Join-Path $private "$session.stderr.log")}
-    if ($NativeSmoke) { $arguments.ArgumentList = '--native-runtime-smoke'; $arguments.WindowStyle = 'Hidden' }
+    $process = [Diagnostics.Process]::new()
+    $process.StartInfo.FileName = $launcher[0].FullName
+    $process.StartInfo.WorkingDirectory = $image
+    $process.StartInfo.UseShellExecute = $false
+    $process.StartInfo.RedirectStandardOutput = $true
+    $process.StartInfo.RedirectStandardError = $true
+    $process.StartInfo.CreateNoWindow = [bool]$NativeSmoke
+    if ($NativeSmoke) { $process.StartInfo.ArgumentList.Add('--native-runtime-smoke') }
+    # Upstream logs can contain configured addon URLs. Discard console streams
+    # by default; opt-in raw logging is only for synthetic local fixture sessions.
+    $capture = $NativeSmoke -or $FixtureLogs
+    $stdoutTarget = if ($capture) { [IO.File]::Create((Join-Path $private "$session.stdout.log")) } else { [IO.Stream]::Null }
+    $stderrTarget = if ($capture) { [IO.File]::Create((Join-Path $private "$session.stderr.log")) } else { [IO.Stream]::Null }
     Write-Host 'Launching the isolated test profile. Close Nuvio normally when finished.'
-    $process = Start-Process @arguments
+    if (-not $process.Start()) { throw 'Application process did not start.' }
+    $stdoutDrain = $process.StandardOutput.BaseStream.CopyToAsync($stdoutTarget)
+    $stderrDrain = $process.StandardError.BaseStream.CopyToAsync($stderrTarget)
+} catch {
+    if ($null -ne $stdoutTarget) { $stdoutTarget.Dispose() }
+    if ($null -ne $stderrTarget) { $stderrTarget.Dispose() }
+    throw
 } finally {
     foreach ($name in $saved.Keys) { [Environment]::SetEnvironmentVariable($name, $saved[$name], 'Process') }
 }
 $process.WaitForExit()
+try {
+    $stdoutDrain.GetAwaiter().GetResult()
+    $stderrDrain.GetAwaiter().GetResult()
+} finally {
+    $stdoutTarget.Dispose()
+    $stderrTarget.Dispose()
+}
 $process.Refresh()
 $crashes = @(Get-ChildItem -LiteralPath $private -File -Filter 'hs_err_pid*.log' | Where-Object LastWriteTimeUtc -ge $started)
 $events = @(Get-WinEvent -FilterHashtable @{LogName='Application'; Id=1000,1001,1002; StartTime=$started.ToLocalTime()} -ErrorAction SilentlyContinue |
@@ -79,5 +104,5 @@ $events = @(Get-WinEvent -FilterHashtable @{LogName='Application'; Id=1000,1001,
     privateCrashReportCount=$crashes.Count; relevantEventSummaries=$events;
     validation='Process exit is diagnostic evidence; acceptance statuses require owner observations.'} |
     ConvertTo-Json -Depth 6 | Set-Content -LiteralPath (Join-Path $run "$session.session.json")
-Write-Host "Exit code: $($process.ExitCode). Edit results.json with observations and evidence; raw logs stay in private/."
+Write-Host "Exit code: $($process.ExitCode). Edit results.json with observations and evidence."
 & "$PSScriptRoot/Collect-OwnerResults.ps1" -RunDirectory $run
