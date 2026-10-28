@@ -21,7 +21,11 @@ failure path. The owner's credentialed failure has not been independently
 reproduced. No claim is made that fixing configuration alone proves account login.
 Inspection of the downloaded 89a208f3 app JAR with javap also confirmed both
 packaged constants are empty (only empty/nonempty booleans were reported).
-The owner's exact 9604cd61 image was not inspected; its image workflow is unchanged.
+The passing CI image for the owner's reported **9604cd61** commit was subsequently
+downloaded and inspected: both backend URL and publishable-key constants are
+empty there too. `Stage3-auth-packaged-config-check.json` records only those
+booleans. This confirms the missing configuration in the matching CI build,
+without collecting the owner's local profile or attempting a real login.
 No evidence currently identifies an ARM64 TLS, WebView2 or native-player defect.
 Email/password sign-in calls the SDK directly; it does not use browser callbacks.
 
@@ -82,3 +86,10 @@ required. Desktop credential-at-rest limitations remain a separate security task
 
 Base CI at 73d7c78c passed all five workflows. New authentication-change CI must
 be checked separately before using its image. No real account was used in tests.
+
+Local final ARM64 regression build passed **103 tests in 19 suites**, with no
+failures, errors or skips. Node fixture and owner archive privacy regressions
+pass. Configuration inspection of the matching 9604cd61 image reports both
+required values empty. Real-account login, synchronization, expired sessions,
+restart restoration and logout remain owner acceptance tests; these are not
+promoted to passes by the configuration tests.
