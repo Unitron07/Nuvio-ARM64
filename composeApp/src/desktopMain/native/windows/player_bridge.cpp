@@ -18,6 +18,7 @@
 #include <cctype>
 #include <cstdint>
 #include <cstdio>
+#include <cstring>
 #include <cwctype>
 #include <deque>
 #include <functional>
@@ -71,6 +72,7 @@ static_assert(sizeof(mpv_node_list) == 24, "libmpv node list ABI must match the 
 typedef enum mpv_event_id {
     MPV_EVENT_NONE = 0,
     MPV_EVENT_SHUTDOWN = 1,
+    MPV_EVENT_END_FILE = 7,
 } mpv_event_id;
 
 typedef struct mpv_event {
@@ -2196,6 +2198,15 @@ private:
             if (!event) continue;
             if (event->event_id == MPV_EVENT_SHUTDOWN) {
                 return;
+            }
+            if (event->event_id == MPV_EVENT_END_FILE && event->data) {
+                // Stable first two fields of mpv_event_end_file (client API 1.9).
+                // Copy before the next wait_event invalidates the event storage.
+                int status[2] = {};
+                std::memcpy(status, event->data, sizeof(status));
+                if (status[0] == 4 && status[1] < 0 && !stopping.load()) {
+                    sendPlayerEvent("playbackError", static_cast<double>(status[1]));
+                }
             }
         }
     }

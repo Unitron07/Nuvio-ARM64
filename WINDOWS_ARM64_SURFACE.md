@@ -401,7 +401,7 @@ and eventually `:composeApp:packageReleaseMsi`. Validate ARM64 jpackage/WiX
 compatibility and the generated MSI before treating packaging as supported.
 The current release workflow remains x64; it has not been relabeled ARM64.
 
-## Completion plan and acceptance gates
+## Completion plan and acceptance gates (historical foundation plan)
 
 1. **Native dependencies:** QuickJS JNI is built and smoke-tested; obtain/rebuild ARM64
    libmpv with required codecs/subtitles and all dependencies. Use reproducible,
@@ -456,7 +456,7 @@ upstream `CONTRIBUTING.md`, including approval and evidence where required.
 - [WebView2 Runtime distribution](https://learn.microsoft.com/en-us/microsoft-edge/webview2/concepts/distribution)
 - [mpv's Windows build references](https://mpv.io/installation/)
 
-## Validation results
+## Validation results (historical foundation milestone)
 
 | Check | Result |
 | --- | --- |

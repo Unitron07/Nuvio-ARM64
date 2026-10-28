@@ -316,7 +316,17 @@ internal class NativePlayerController(
                         resolveControlsPage(),
                         pending.decoderPriority,
                         pending.nvidiaRtxSuperResolutionEnabled,
-                        eventSink,
+                        NativePlayerEventSink { type, value ->
+                            if (type == "playbackError") {
+                                SwingUtilities.invokeLater {
+                                    if (!releaseRequested && pendingSource === pending) {
+                                        pending.onError("Playback failed (mpv error ${value.toInt()}).")
+                                    }
+                                }
+                            } else {
+                                eventSink.onPlayerEvent(type, value)
+                            }
+                        },
                     ).also { if (it == 0L) error("Native player did not return a handle.") }
                 }.onSuccess { created ->
                     val accepted = synchronized(lifecycleLock) {

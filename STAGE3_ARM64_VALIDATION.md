@@ -64,9 +64,38 @@ is a different persistence path and still needs a configured owner account.
 
 ## Automated tests
 
+### Local Surface application evidence
+
+On October 27, the passing `d25a19ab` CI image was downloaded and its artifact
+SHA256 verified. On this Surface Pro 11, Windows ARM64 10.0.26300.0, packaged
+JVM 21.0.11/aarch64:
+
+- Native prerequisites pass locally, including five JNI mpv create/destroy cycles.
+- Normal app launch, Continue Without Account, local profile creation, settings
+  navigation and fixture addon installation pass through the actual UI.
+- Home catalog, title metadata and three stream choices load from loopback.
+- The protected HTTP redirect stream visibly renders through the actual addon →
+  selection → JNI → libmpv path. The server records 206/range requests with all
+  four header checks true, including literal comma/backslash values.
+- K pause, native seek to 15 seconds, K resume and advancing playback pass.
+  Player close restores the stream list. A second direct stream renders after
+  a failed-stream session. Normal application close exits 0 with no new JVM crash
+  report; a fresh launch restores the local profile and addon catalog.
+- A controlled 503 exposed a terminal-error defect: the old bridge drained
+  END_FILE errors without notifying Kotlin, leaving Buffering visible. The new
+  bridge forwards only error reason/code events to the existing error UI;
+  callbacks are bound to the active source so retired-player errors are ignored.
+  The new regression passes; retesting the corrected UI requires its new image.
+
+These are UI-automation observations on real hardware, not fabricated owner
+results. Screenshots, safe fixture summaries and session manifests are delivered
+with local evidence. Full HTTPS application playback, ten-session navigation,
+audio/subtitle/hardware-decode behavior, real credentials and leak measurements
+are still pending. No account, provider credential or real user profile was used.
+
 Local October 27 evidence: native Microsoft ARM64 JDK 21.0.12.1+1 compiled the
-desktop application/tests and passed **99 tests in 17 suites, zero failures,
-errors or skips**. Nine tests are new Stage 3 cases; the selection also includes
+desktop application/tests and passed **100 tests in 18 suites, zero failures,
+errors or skips**. Ten tests are new Stage 3 cases; the selection also includes
 existing plugin concurrency, teardown, debrid and playback-state regressions.
 The fixture server self-test, owner-archive privacy test, PowerShell parser checks
 and `git diff --check` pass. Real desktop HTTP/QuickJS requests pass a trusted
@@ -77,8 +106,9 @@ cycles for each of HTTP and verified HTTPS, followed by DLL unload, using the
 existing pinned ARM64 libmpv (SHA256
 `f90cee7e3dbb0a12fbfa6b95af1fb2bb22dbfebf8422efc0324918ee75661850`).
 This local environment has no MSVC/Windows SDK installation; the changed C++
-bridge must be compiled by native CI. No new image/UI playback is claimed from
-these tests. Fresh-JVM probes use an explicit classpath file and Java argument
+bridge is compiled by native CI. Unit tests alone do not establish UI playback;
+the separate Surface observations above establish the stated HTTP workflow.
+Fresh-JVM probes use an explicit classpath file and Java argument
 files to avoid classloader assumptions and Windows command-line length limits.
 Native header failure was reproduced before the API fix.
 
@@ -135,11 +165,14 @@ Use PowerShell 7 and Node.js. Keep a native ARM64 JDK for source tests.
 
 1. Download the image and owner tools artifacts for the same commit and extract
    them. The tools archive preserves `scripts/windows/stage3/` and its helpers.
-   A new image with an empty configuration may stop at account/welcome screens.
-   To validate actual app routes, build using your existing authorized service
-   configuration (`NUVIO_SUPABASE_URL`, `NUVIO_SUPABASE_ANON_KEY`, and where needed
-   `TMDB_API_KEY` via the existing ignored `local.properties`/build mechanism).
-   Do not put configuration values in result files or the PR.
+   For the local fixture workflow, select **Continue Without Account**. If no
+   profile exists, select **Manage Profiles → Add Profile**, enter a synthetic
+   name and create the local profile. No backend key is needed for this path.
+   Real account/cloud-service tests need your existing authorized configuration
+   (`NUVIO_SUPABASE_URL`, `NUVIO_SUPABASE_ANON_KEY`, and where needed `TMDB_API_KEY`
+   through the existing ignored local.properties/build mechanism). Keep those
+   values out of results and the PR. Do not update the development image through
+   the upstream update banner; updater identity remains a later validation gate.
 2. In one shell, serve your own authorized, seekable video (30+ seconds is useful):
 
    ```powershell
@@ -208,23 +241,23 @@ Use PowerShell 7 and Node.js. Keep a native ARM64 JDK for source tests.
 
 ## Owner checklist and acceptance ledger
 
-All Stage 3 hardware/application rows below are pending until an owner manifest
-and reproducible evidence establish them. PR #3's historical Surface results are
-retained in the ARM64 document, not promoted into Stage 3 results.
+The ledger separates the named local Surface observations from the remaining
+owner matrix. PR #3's historical Surface results are retained in the ARM64
+document, not promoted into Stage 3 results.
 
 | Acceptance | Status / required evidence |
 | --- | --- |
-| Native ARM64 application launches | Pending new image + normal UI launch/close; previous Stage 2 evidence exists |
-| Test addon catalog and metadata | Automated transport/parser/registration pass; owner app browse pending |
-| Addon stream discovery | Automated parser/QuickJS fetch pass; owner stream list pending |
-| URLs and headers reach libmpv | Native API fixture passes locally; new JNI bridge/app route pending |
+| Native ARM64 application launches | Pass on Surface for d25a19ab: native smoke, normal UI and exit 0; error-fix image rerun pending |
+| Test addon catalog and metadata | Pass automated tests and actual Surface local-addon UI |
+| Addon stream discovery | Pass automated parser/QuickJS fetch and actual Surface stream list |
+| URLs and headers reach libmpv | Pass actual Surface HTTP/JNI route and native HTTP/HTTPS fixtures; UI HTTPS remains pending |
 | Authorized HTTP/HTTPS through actual UI | Pending owner, both protocols required |
-| Navigation and repeated playback | Pending owner: browse → title → play → seek/pause → back → repeat 10 times → close |
+| Navigation and repeated playback | Two successful Surface sessions plus controlled failure/return pass; full ten-session matrix pending |
 | Settings and user state persist | Automated disk reload/corruption and fresh-JVM restart pass; full UI/cloud restart pending; secure credential storage gap above |
 | Provider automated mocks | Pass locally: existing Real-Debrid resolver through loopback HTTP; no account required |
 | Real provider validation documented | Procedure implemented; actual authentication/playback/restart/logout pending owner |
-| Existing ARM64 native CI green | Pending branch CI; check new image and native workflows |
-| Existing x64 compatibility preserved | Pending x64 application integration and existing native JNI CI; full x64 UI remains owner regression |
+| Existing ARM64 native CI green | All five workflows pass at d25a19ab; terminal-error follow-up CI pending |
+| Existing x64 compatibility preserved | x64 application integration and native JNI pass at d25a19ab; follow-up CI and full x64 UI pending |
 | Owner tools/instructions | Implemented; archive privacy/manifest tests pass locally |
 | Documentation reflects evidence | Implemented ledger; update with test reports and CI links |
 

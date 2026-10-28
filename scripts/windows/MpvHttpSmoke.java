@@ -31,6 +31,10 @@ public class MpvHttpSmoke {
     } else server = HttpServer.create(new InetSocketAddress("127.0.0.1", 0), 0);
     String base = (tls ? "https" : "http") + "://127.0.0.1:" + server.getAddress().getPort();
     String query = "fixture=one%2Btwo&session=local";
+    server.createContext("/failure", exchange -> {
+      exchange.sendResponseHeaders(503, -1);
+      exchange.close();
+    });
     server.createContext("/redirect", exchange -> {
       redirects.incrementAndGet();
       exchange.getResponseHeaders().set("Location", base + "/fixture.avi?" + exchange.getRequestURI().getRawQuery());
@@ -120,6 +124,20 @@ public class MpvHttpSmoke {
           throw new IllegalStateException("loaded="+loaded+" decoded="+decoded+" seek="+seeked+" eof="+eof+" requests="+requests+" time="+maxPosition);
         System.out.println("PASS: ARM64 " + (tls ? "HTTPS" : "HTTP") + " protected redirect, headers, decode, pause, seek, resume and EOF; requests="+requests+" maxPosition="+maxPosition);
         check(lib.getFunction("mpv_command").invokeInt(new Object[]{handle,new StringArray(new String[]{"stop"})}), "stop");
+        if (cycle == 0) {
+          check(lib.getFunction("mpv_command").invokeInt(new Object[]{handle,new StringArray(new String[]{"loadfile",base + "/failure","replace"})}), "load controlled error");
+          boolean failureObserved = false;
+          long errorDeadline = System.nanoTime() + 5_000_000_000L;
+          while (!failureObserved && System.nanoTime() < errorDeadline) {
+            Pointer event = lib.getFunction("mpv_wait_event").invokePointer(new Object[]{handle,0.05});
+            if (event.getInt(0) == 7) {
+              Pointer data = event.getPointer(16);
+              failureObserved = data != null && data.getInt(0) == 4 && data.getInt(4) < 0;
+            }
+          }
+          if (!failureObserved) throw new IllegalStateException("Controlled 503 did not produce a terminal mpv error");
+          System.out.println("PASS: terminal mpv error for controlled HTTP 503; later cycles verify recovery");
+        }
       } finally { lib.getFunction("mpv_terminate_destroy").invokeVoid(new Object[]{handle}); }
       }
     } finally { server.stop(0); }

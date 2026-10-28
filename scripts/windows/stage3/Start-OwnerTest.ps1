@@ -48,7 +48,7 @@ $overrides = @{
     APPDATA=(Join-Path $run 'profile/roaming'); LOCALAPPDATA=(Join-Path $run 'profile/local');
     WEBVIEW2_USER_DATA_FOLDER=(Join-Path $run 'profile/webview2');
     NUVIO_DESKTOP_TEST_DATA_DIR=(Join-Path $run 'profile/native');
-    JAVA_TOOL_OPTIONS=('-XX:ErrorFile="' + (Join-Path $private 'hs_err_pid%p.log') + '"');
+    JAVA_TOOL_OPTIONS=('-Duser.home="' + (Join-Path $run 'profile/home') + '" -XX:ErrorFile="' + (Join-Path $private 'hs_err_pid%p.log') + '"');
     NUVIO_DESKTOP_SMOKE_PLAYER_URL=$null; NUVIO_DESKTOP_SMOKE_REPORT=$null
 }
 $started = [DateTime]::UtcNow
@@ -59,7 +59,7 @@ try {
         $saved[$name] = [Environment]::GetEnvironmentVariable($name, 'Process')
         [Environment]::SetEnvironmentVariable($name, $overrides[$name], 'Process')
     }
-    New-Item -ItemType Directory -Force -Path $env:APPDATA,$env:LOCALAPPDATA,$env:WEBVIEW2_USER_DATA_FOLDER | Out-Null
+    New-Item -ItemType Directory -Force -Path $env:APPDATA,$env:LOCALAPPDATA,$env:WEBVIEW2_USER_DATA_FOLDER,(Join-Path $run 'profile/home') | Out-Null
     $process = [Diagnostics.Process]::new()
     $process.StartInfo.FileName = $launcher[0].FullName
     $process.StartInfo.WorkingDirectory = $image
@@ -86,8 +86,8 @@ try {
 }
 $process.WaitForExit()
 try {
-    $stdoutDrain.GetAwaiter().GetResult()
-    $stderrDrain.GetAwaiter().GetResult()
+    [void]$stdoutDrain.GetAwaiter().GetResult()
+    [void]$stderrDrain.GetAwaiter().GetResult()
 } finally {
     $stdoutTarget.Dispose()
     $stderrTarget.Dispose()
