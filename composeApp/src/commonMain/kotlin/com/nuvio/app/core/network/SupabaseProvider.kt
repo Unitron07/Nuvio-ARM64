@@ -35,6 +35,7 @@ object SupabaseProvider {
     @OptIn(SupabaseInternal::class)
     private fun createClient(): SupabaseClient {
         val configuration = ServerConfigurationRepository.active.value
+        requireAuthConfiguration(configuration)
         val userAgent = "NuvioMobile/${AppVersionConfig.VERSION_NAME.ifBlank { "dev" }}"
         lateinit var client: SupabaseClient
         client = createSupabaseClient(

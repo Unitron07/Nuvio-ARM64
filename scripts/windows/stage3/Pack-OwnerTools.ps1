@@ -10,6 +10,7 @@ foreach ($name in @('audit-arm64-image.ps1','verify-pe-architecture.ps1','make-s
     Copy-Item -LiteralPath (Join-Path "$repo/scripts/windows" $name) -Destination $scripts
 }
 Copy-Item -LiteralPath "$repo/STAGE3_ARM64_VALIDATION.md" -Destination $output
+Copy-Item -LiteralPath "$repo/STAGE3_AUTH_INVESTIGATION.md" -Destination $output
 $zip = "$output.zip"
-Compress-Archive -LiteralPath (Join-Path $output 'scripts'),(Join-Path $output 'STAGE3_ARM64_VALIDATION.md') -DestinationPath $zip
+Compress-Archive -LiteralPath (Join-Path $output 'scripts'),(Join-Path $output 'STAGE3_ARM64_VALIDATION.md'),(Join-Path $output 'STAGE3_AUTH_INVESTIGATION.md') -DestinationPath $zip
 Write-Host "Owner tools: $zip (application image and authorized media supplied separately)"

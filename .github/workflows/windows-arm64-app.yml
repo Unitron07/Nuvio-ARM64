@@ -92,6 +92,10 @@ jobs:
           if-no-files-found: error
           retention-days: 7
       - name: Create development app image
+        env:
+          NUVIO_SUPABASE_URL: ${{ vars.NUVIO_SUPABASE_URL || secrets.NUVIO_SUPABASE_URL }}
+          NUVIO_SUPABASE_ANON_KEY: ${{ vars.NUVIO_SUPABASE_ANON_KEY || secrets.NUVIO_SUPABASE_ANON_KEY }}
+          NUVIO_SUPABASE_FALLBACK_URL: ${{ vars.NUVIO_SUPABASE_FALLBACK_URL || secrets.NUVIO_SUPABASE_FALLBACK_URL }}
         id: image
         shell: pwsh
         run: |

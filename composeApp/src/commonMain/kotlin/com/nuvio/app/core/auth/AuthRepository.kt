@@ -2,6 +2,7 @@ package com.nuvio.app.core.auth
 
 import co.touchlab.kermit.Logger
 import com.nuvio.app.core.network.SupabaseProvider
+import com.nuvio.app.core.network.MissingAuthConfiguration
 import com.nuvio.app.core.storage.LocalAccountDataCleaner
 import io.github.jan.supabase.auth.auth
 import io.github.jan.supabase.auth.exception.AuthRestException
@@ -131,7 +132,13 @@ object AuthRepository {
             this.password = password
         }
     }.onFailure { e ->
-        log.e(e) { "Email sign-in failed" }
+        // Exception text/stack traces may contain authenticated request details.
+        val backendHost = runCatching {
+            io.ktor.http.Url(com.nuvio.app.core.network.ServerConfigurationRepository.active.value.backendUrl).host
+        }.getOrDefault("").ifBlank { "missing" }
+        val status = e.findCause<RestException>()?.statusCode
+        val stage = if (e.findCause<MissingAuthConfiguration>() != null) "configuration" else "sign-in"
+        log.e { "Email sign-in failed; stage=$stage host=$backendHost status=$status exception=${e::class.simpleName}" }
         _error.value = e.safeAuthErrorDescription()
             ?: getString(Res.string.auth_sign_in_failed)
     }
@@ -276,7 +283,7 @@ object AuthRepository {
     }
 
     private fun Throwable.safeAuthErrorDescription(): String? =
-        findCause<AuthRestException>()
+        findCause<MissingAuthConfiguration>()?.message ?: findCause<AuthRestException>()
             ?.errorDescription
             ?.trim()
             ?.takeIf { it.isNotEmpty() }

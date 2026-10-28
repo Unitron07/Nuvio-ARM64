@@ -4,6 +4,10 @@ Stage 3 remains **in progress**. Implementation, automated evidence, native
 runtime evidence and interactive owner validation are separate gates.
 Baseline: merged `main` `bc0b30ba` (PR #3), inspected October 27, 2026.
 
+October 28: [authentication investigation and owner-reported 9604cd61 hardware
+results](STAGE3_AUTH_INVESTIGATION.md). Account authentication remains pending;
+the ARM64 image workflow previously omitted upstream's required build configuration.
+
 ## Inspection and implementation plan
 
 - Preserve the pinned ARM64 QuickJS runtime, libmpv Lua-disable embedding preset,
