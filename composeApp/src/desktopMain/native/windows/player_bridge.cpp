@@ -18,9 +18,11 @@
 #include <cctype>
 #include <cstdint>
 #include <cstdio>
+#include <cstring>
 #include <cwctype>
 #include <deque>
 #include <functional>
+#include <filesystem>
 #include <memory>
 #include <mutex>
 #include <sstream>
@@ -43,11 +45,34 @@ typedef enum mpv_format {
     MPV_FORMAT_FLAG = 3,
     MPV_FORMAT_INT64 = 4,
     MPV_FORMAT_DOUBLE = 5,
+    MPV_FORMAT_NODE = 6,
+    MPV_FORMAT_NODE_ARRAY = 7,
 } mpv_format;
+
+struct mpv_node_list;
+typedef struct mpv_node {
+    union {
+        char *string;
+        int flag;
+        int64_t int64;
+        double double_;
+        struct mpv_node_list *list;
+        void *ba;
+    } u;
+    mpv_format format;
+} mpv_node;
+typedef struct mpv_node_list {
+    int num;
+    mpv_node *values;
+    char **keys;
+} mpv_node_list;
+static_assert(sizeof(mpv_node) == 16, "libmpv node ABI must match the 64-bit client API");
+static_assert(sizeof(mpv_node_list) == 24, "libmpv node list ABI must match the 64-bit client API");
 
 typedef enum mpv_event_id {
     MPV_EVENT_NONE = 0,
     MPV_EVENT_SHUTDOWN = 1,
+    MPV_EVENT_END_FILE = 7,
 } mpv_event_id;
 
 typedef struct mpv_event {
@@ -471,14 +496,27 @@ std::string hresultMessage(const char *operation, HRESULT hr) {
 }
 
 std::wstring localAppDataDirectory(const wchar_t *name) {
-    PWSTR localAppData = nullptr;
-    HRESULT result = SHGetKnownFolderPath(FOLDERID_LocalAppData, KF_FLAG_CREATE, nullptr, &localAppData);
-    if (FAILED(result) || !localAppData) {
-        if (localAppData) CoTaskMemFree(localAppData);
-        throw std::runtime_error(hresultMessage("SHGetKnownFolderPath", result));
+    // SHGetKnownFolderPath ignores a process-local LOCALAPPDATA override.
+    // Explicit test isolation must therefore be handled before that lookup.
+    std::wstring directory;
+    DWORD testPathSize = GetEnvironmentVariableW(L"NUVIO_DESKTOP_TEST_DATA_DIR", nullptr, 0);
+    if (testPathSize > 0) {
+        std::vector<wchar_t> testPath(testPathSize);
+        DWORD copied = GetEnvironmentVariableW(L"NUVIO_DESKTOP_TEST_DATA_DIR", testPath.data(), testPathSize);
+        if (copied == 0 || copied >= testPathSize || !std::filesystem::path(testPath.data()).is_absolute()) {
+            throw std::runtime_error("NUVIO_DESKTOP_TEST_DATA_DIR must be an absolute test directory");
+        }
+        directory = testPath.data();
+    } else {
+        PWSTR localAppData = nullptr;
+        HRESULT result = SHGetKnownFolderPath(FOLDERID_LocalAppData, KF_FLAG_CREATE, nullptr, &localAppData);
+        if (FAILED(result) || !localAppData) {
+            if (localAppData) CoTaskMemFree(localAppData);
+            throw std::runtime_error(hresultMessage("SHGetKnownFolderPath", result));
+        }
+        directory = localAppData;
+        CoTaskMemFree(localAppData);
     }
-    std::wstring directory(localAppData);
-    CoTaskMemFree(localAppData);
     directory += L"\\Nuvio\\";
     directory += name;
     int createResult = SHCreateDirectoryExW(nullptr, directory.c_str(), nullptr);
@@ -1914,16 +1952,21 @@ private:
             }
 
             if (!headerLines.empty()) {
-                std::string headers;
+                std::vector<mpv_node> headers(headerLines.size());
                 for (size_t index = 0; index < headerLines.size(); index++) {
-                    if (index > 0) headers.push_back(',');
-                    // Escape backslashes and commas in header values
-                    for (char c : headerLines[index]) {
-                        if (c == '\\' || c == ',') headers.push_back('\\');
-                        headers.push_back(c);
-                    }
+                    headers[index].format = MPV_FORMAT_STRING;
+                    headers[index].u.string = const_cast<char *>(headerLines[index].c_str());
                 }
-                setMpvOptionStringLocked("http-header-fields", headers.c_str());
+                // A typed array avoids mpv's comma-list parser, which does not
+                // decode doubled backslashes and cannot represent every header.
+                mpv_node_list list = {static_cast<int>(headers.size()), headers.data(), nullptr};
+                mpv_node node = {};
+                node.format = MPV_FORMAT_NODE_ARRAY;
+                node.u.list = &list;
+                int result = api.setOption(mpv, "http-header-fields", MPV_FORMAT_NODE, &node);
+                if (result < 0) {
+                    throw std::runtime_error(std::string("mpv HTTP headers option failed: ") + api.errorText(result));
+                }
             }
 
             int initResult = api.initialize(mpv);
@@ -2155,6 +2198,15 @@ private:
             if (!event) continue;
             if (event->event_id == MPV_EVENT_SHUTDOWN) {
                 return;
+            }
+            if (event->event_id == MPV_EVENT_END_FILE && event->data) {
+                // Stable first two fields of mpv_event_end_file (client API 1.9).
+                // Copy before the next wait_event invalidates the event storage.
+                int status[2] = {};
+                std::memcpy(status, event->data, sizeof(status));
+                if (status[0] == 4 && status[1] < 0 && !stopping.load()) {
+                    sendPlayerEvent("playbackError", static_cast<double>(status[1]));
+                }
             }
         }
     }

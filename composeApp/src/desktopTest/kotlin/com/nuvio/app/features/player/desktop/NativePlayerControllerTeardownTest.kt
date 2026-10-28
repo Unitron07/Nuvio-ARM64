@@ -25,6 +25,7 @@ class NativePlayerControllerTeardownTest {
         val released = CountDownLatch(1)
         val host = NativePlayerHost()
         val controller = NativePlayerController(
+            resolveControlsPage = { "about:blank" },
             host = host,
             nativeCreate = failNativeCreate,
             nativeDispose = { handle -> events += "disposed-$handle" },
@@ -43,7 +44,7 @@ class NativePlayerControllerTeardownTest {
     @Test
     fun releaseInvalidatesPendingAttachBeforeItsNativeCreateCanPublish() {
         val host = NativePlayerHost()
-        val controller = NativePlayerController(host = host, nativeCreate = failNativeCreate, nativeDispose = {})
+        val controller = NativePlayerController(resolveControlsPage = { "about:blank" }, host = host, nativeCreate = failNativeCreate, nativeDispose = {})
 
         controller.attach(
             sourceUrl = "https://example.invalid/video.mp4",
@@ -77,6 +78,7 @@ class NativePlayerControllerTeardownTest {
         val createdSources = Collections.synchronizedList(mutableListOf<String>())
         val disposedHandles = Collections.synchronizedList(mutableListOf<Long>())
         val controller = NativePlayerController(
+            resolveControlsPage = { "about:blank" },
             host = NativePlayerHost(),
             nativeCreate = { _, source, _, _, _, _, _, _, _ ->
                 createdSources += source
@@ -153,6 +155,7 @@ class NativePlayerControllerTeardownTest {
         val allowNewCreate = CountDownLatch(1)
         val errors = AtomicInteger()
         val controller = NativePlayerController(
+            resolveControlsPage = { "about:blank" },
             host = NativePlayerHost(),
             nativeCreate = failNativeCreate,
             nativeDispose = {},
@@ -212,6 +215,7 @@ class NativePlayerControllerTeardownTest {
         val createWaitCompleted = CountDownLatch(1)
         val replacementErrors = AtomicInteger()
         val controller = NativePlayerController(
+            resolveControlsPage = { "about:blank" },
             host = NativePlayerHost(),
             nativeCreate = failNativeCreate,
             nativeDispose = {},
@@ -270,6 +274,7 @@ class NativePlayerControllerTeardownTest {
         val resolvedHosts = AtomicInteger()
         val errors = AtomicInteger()
         val controller = NativePlayerController(
+            resolveControlsPage = { "about:blank" },
             host = NativePlayerHost(),
             nativeCreate = failNativeCreate,
             nativeDispose = {},
@@ -317,6 +322,7 @@ class NativePlayerControllerTeardownTest {
         }
         assertTrue(edtBlocked.await(2, TimeUnit.SECONDS))
         val controller = NativePlayerController(
+            resolveControlsPage = { "about:blank" },
             host = NativePlayerHost(),
             nativeCreate = failNativeCreate,
             nativeDispose = {},
@@ -344,7 +350,7 @@ class NativePlayerControllerTeardownTest {
     @Test
     fun attachIsRejectedAfterNavigationReleaseStarts() {
         val host = NativePlayerHost()
-        val controller = NativePlayerController(host = host, nativeCreate = failNativeCreate, nativeDispose = {})
+        val controller = NativePlayerController(resolveControlsPage = { "about:blank" }, host = host, nativeCreate = failNativeCreate, nativeDispose = {})
         val releaseCompleted = CountDownLatch(1)
 
         controller.releaseBeforeNavigation { releaseCompleted.countDown() }
@@ -366,7 +372,7 @@ class NativePlayerControllerTeardownTest {
     @Test
     fun sourceReplacementDisposePreservesControlCallbacks() {
         val host = NativePlayerHost()
-        val controller = NativePlayerController(host = host, nativeCreate = failNativeCreate, nativeDispose = {})
+        val controller = NativePlayerController(resolveControlsPage = { "about:blank" }, host = host, nativeCreate = failNativeCreate, nativeDispose = {})
         controller.setControlCallbacks(
             onAction = { true },
             onEvent = { _, _ -> true },
@@ -386,6 +392,7 @@ class NativePlayerControllerTeardownTest {
         val allowDispose = CountDownLatch(1)
         val released = CountDownLatch(1)
         val controller = NativePlayerController(
+            resolveControlsPage = { "about:blank" },
             host = NativePlayerHost(),
             nativeCreate = failNativeCreate,
             nativeDispose = {
@@ -409,6 +416,7 @@ class NativePlayerControllerTeardownTest {
         val hostResolutions = AtomicInteger()
         val retryError = CountDownLatch(1)
         val controller = NativePlayerController(
+            resolveControlsPage = { "about:blank" },
             host = NativePlayerHost(),
             nativeCreate = failNativeCreate,
             nativeDispose = { error("dispose failed") },
@@ -445,6 +453,7 @@ class NativePlayerControllerTeardownTest {
         val hostResolutions = AtomicInteger()
         val replacementError = CountDownLatch(1)
         val controller = NativePlayerController(
+            resolveControlsPage = { "about:blank" },
             host = NativePlayerHost(),
             nativeCreate = failNativeCreate,
             nativeDispose = {
@@ -485,6 +494,7 @@ class NativePlayerControllerTeardownTest {
         val released = AtomicInteger()
         val failed = CountDownLatch(1)
         val controller = NativePlayerController(
+            resolveControlsPage = { "about:blank" },
             host = NativePlayerHost(),
             nativeCreate = failNativeCreate,
             nativeDispose = {
@@ -512,6 +522,7 @@ class NativePlayerControllerTeardownTest {
         val firstFailure = CountDownLatch(1)
         val retryFailure = CountDownLatch(1)
         val controller = NativePlayerController(
+            resolveControlsPage = { "about:blank" },
             host = NativePlayerHost(),
             nativeCreate = failNativeCreate,
             nativeDispose = { error("dispose failed") },
@@ -544,6 +555,7 @@ class NativePlayerControllerTeardownTest {
         val allowDispose = CountDownLatch(1)
         val released = CountDownLatch(1)
         val controller = NativePlayerController(
+            resolveControlsPage = { "about:blank" },
             host = NativePlayerHost(),
             nativeCreate = failNativeCreate,
             nativeDispose = {
@@ -569,6 +581,7 @@ class NativePlayerControllerTeardownTest {
         val disposeFinished = CountDownLatch(1)
         val completed = AtomicInteger()
         val controller = NativePlayerController(
+            resolveControlsPage = { "about:blank" },
             host = NativePlayerHost(),
             nativeCreate = failNativeCreate,
             nativeDispose = {
@@ -604,6 +617,7 @@ class NativePlayerControllerTeardownTest {
         val failed = CountDownLatch(1)
         val completed = AtomicInteger()
         val controller = NativePlayerController(
+            resolveControlsPage = { "about:blank" },
             host = NativePlayerHost(),
             nativeCreate = failNativeCreate,
             nativeDispose = {},
@@ -640,6 +654,7 @@ class NativePlayerControllerTeardownTest {
         val done = CountDownLatch(2)
         val calls = AtomicInteger()
         val controller = NativePlayerController(
+            resolveControlsPage = { "about:blank" },
             host = NativePlayerHost(),
             nativeCreate = failNativeCreate,
             nativeDispose = {
@@ -667,7 +682,7 @@ class NativePlayerControllerTeardownTest {
         val teardownStarted = CountDownLatch(1)
         val allowTeardown = CountDownLatch(1)
         val releaseCompleted = CountDownLatch(1)
-        val controller = NativePlayerController(host = NativePlayerHost(), nativeCreate = failNativeCreate, nativeDispose = {})
+        val controller = NativePlayerController(resolveControlsPage = { "about:blank" }, host = NativePlayerHost(), nativeCreate = failNativeCreate, nativeDispose = {})
         val teardown = thread(isDaemon = true, name = "test-native-teardown") {
             teardownStarted.countDown()
             allowTeardown.await()
@@ -688,6 +703,7 @@ class NativePlayerControllerTeardownTest {
         val allowDispose = CountDownLatch(1)
         val releaseCompleted = CountDownLatch(1)
         val controller = NativePlayerController(
+            resolveControlsPage = { "about:blank" },
             host = NativePlayerHost(),
             nativeCreate = failNativeCreate,
             nativeDispose = {
@@ -716,7 +732,7 @@ class NativePlayerControllerTeardownTest {
     @Test
     fun releaseCompletionWaitsForInFlightNativeCreate() {
         val host = NativePlayerHost()
-        val controller = NativePlayerController(host = host, nativeCreate = failNativeCreate, nativeDispose = {})
+        val controller = NativePlayerController(resolveControlsPage = { "about:blank" }, host = host, nativeCreate = failNativeCreate, nativeDispose = {})
         val createStarted = CountDownLatch(1)
         val allowCreate = CountDownLatch(1)
         val releaseCompleted = CountDownLatch(1)
@@ -744,6 +760,7 @@ class NativePlayerControllerTeardownTest {
         val allowDispose = CountDownLatch(1)
         val releaseCompleted = CountDownLatch(1)
         val controller = NativePlayerController(
+            resolveControlsPage = { "about:blank" },
             host = NativePlayerHost(),
             nativeCreate = failNativeCreate,
             nativeDispose = {
@@ -790,6 +807,7 @@ class NativePlayerControllerTeardownTest {
         val failures = AtomicInteger()
         val completions = AtomicInteger()
         val controller = NativePlayerController(
+            resolveControlsPage = { "about:blank" },
             host = NativePlayerHost(),
             nativeCreate = failNativeCreate,
             nativeDispose = {

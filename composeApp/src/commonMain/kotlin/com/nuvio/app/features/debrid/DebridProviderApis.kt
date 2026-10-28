@@ -191,13 +191,14 @@ internal class PremiumizeDebridProviderApi(
             ?: throw IllegalStateException("Premiumize sign-in is missing PREMIUMIZE_CLIENT_ID.")
 }
 
-private class RealDebridProviderApi(
+internal class RealDebridProviderApi(
     private val fileSelector: RealDebridFileSelector = RealDebridFileSelector(),
+    private val client: RealDebridClient = RealDebridApiClient,
 ) : DebridProviderApi {
     override val provider: DebridProvider = DebridProviders.RealDebrid
 
     override suspend fun validateApiKey(apiKey: String): Boolean =
-        RealDebridApiClient.validateApiKey(apiKey)
+        client.validateApiKey(apiKey)
 
     override suspend fun resolveClientStream(
         stream: StreamItem,
@@ -211,12 +212,12 @@ private class RealDebridProviderApi(
             ?: return DirectDebridResolveResult.Stale
 
         return try {
-            val add = RealDebridApiClient.addMagnet(apiKey, magnet)
+            val add = client.addMagnet(apiKey, magnet)
             val torrentId = add.body?.id?.takeIf { add.isSuccessful && it.isNotBlank() }
                 ?: return add.toFailureForAdd()
             var resolved = false
             try {
-                val infoBefore = RealDebridApiClient.getTorrentInfo(apiKey, torrentId)
+                val infoBefore = client.getTorrentInfo(apiKey, torrentId)
                 if (!infoBefore.isSuccessful) {
                     return DirectDebridResolveResult.Stale
                 }
@@ -228,18 +229,18 @@ private class RealDebridProviderApi(
                     episode = episode,
                 ) ?: return DirectDebridResolveResult.Stale
                 val fileId = file.id ?: return DirectDebridResolveResult.Stale
-                val select = RealDebridApiClient.selectFiles(apiKey, torrentId, fileId.toString())
+                val select = client.selectFiles(apiKey, torrentId, fileId.toString())
                 if (!select.isSuccessful && select.status != 202) {
                     return DirectDebridResolveResult.Stale
                 }
 
-                val infoAfter = RealDebridApiClient.getTorrentInfo(apiKey, torrentId)
+                val infoAfter = client.getTorrentInfo(apiKey, torrentId)
                 if (!infoAfter.isSuccessful) {
                     return DirectDebridResolveResult.Stale
                 }
                 val link = infoAfter.body?.firstDownloadLink()
                     ?: return DirectDebridResolveResult.Stale
-                val unrestrict = RealDebridApiClient.unrestrictLink(apiKey, link)
+                val unrestrict = client.unrestrictLink(apiKey, link)
                 if (!unrestrict.isSuccessful) {
                     return DirectDebridResolveResult.Stale
                 }
@@ -254,7 +255,7 @@ private class RealDebridProviderApi(
                 )
             } finally {
                 if (!resolved) {
-                    runCatching { RealDebridApiClient.deleteTorrent(apiKey, torrentId) }
+                    runCatching { client.deleteTorrent(apiKey, torrentId) }
                 }
             }
         } catch (error: Exception) {

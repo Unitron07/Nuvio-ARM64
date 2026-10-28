@@ -1,0 +1,1 @@
+{"name":"Stage 3 Local Plugins","version":"1.0.0","scrapers":[{"id":"stage3-fixture","name":"Stage 3 Fixture","version":"1.0.0","filename":"scraper.js","supportedTypes":["movie"],"supportedPlatforms":["desktop"]}]}

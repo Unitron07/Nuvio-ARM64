@@ -75,6 +75,16 @@ Linux:
 
 The shared app is built with Kotlin Multiplatform and Compose Multiplatform.
 
+## Windows ARM64 development
+
+Stage 3 core functionality is validated and ready for merge: native ARM64 launch,
+local addons, account sign-in/synchronization and real debrid playback are
+owner-confirmed on Surface Pro 11. Automated checks and owner reports are recorded
+separately; remaining hardening and touch work are in the
+[Stage 4 roadmap](STAGE4_ROADMAP.md). See the
+[ARM64 build notes](WINDOWS_ARM64_SURFACE.md) and
+[Stage 3 tests, evidence and Surface owner procedure](STAGE3_ARM64_VALIDATION.md).
+
 ## License
 
 [GNU General Public License v3.0](./LICENSE)

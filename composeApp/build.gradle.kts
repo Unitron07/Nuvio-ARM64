@@ -1304,6 +1304,7 @@ kotlin {
             implementation(libs.reorderable)
         }
         val desktopTest by getting {
+            resources.srcDir("../scripts/windows/stage3/fixtures")
             dependencies {
                 implementation(compose.desktop.uiTestJUnit4)
             }
@@ -1314,6 +1315,49 @@ kotlin {
             implementation("io.ktor:ktor-client-mock:${libs.versions.ktor.get()}")
         }
     }
+}
+
+// Tests must never read or overwrite the owner's desktop profile. Keep the
+// override in the forked JVM, leaving Gradle's own home/toolchain untouched.
+val stage3TestKeyStore = layout.buildDirectory.file("stage3-test-tls/fixture.p12")
+val generateStage3TestTls = tasks.register<Exec>("generateStage3TestTls") {
+    outputs.file(stage3TestKeyStore)
+    doFirst {
+        val store = stage3TestKeyStore.get().asFile
+        store.parentFile.mkdirs()
+        store.delete()
+        val executable = if (isWindowsHost) "keytool.exe" else "keytool"
+        commandLine(file("${System.getProperty("java.home")}/bin/$executable"),
+            "-genkeypair", "-alias", "fixture", "-keyalg", "RSA", "-keysize", "2048",
+            "-validity", "3650", "-dname", "CN=localhost", "-ext", "SAN=ip:127.0.0.1,dns:localhost",
+            "-storetype", "PKCS12", "-keystore", store, "-storepass", "fixture-only", "-keypass", "fixture-only", "-noprompt")
+    }
+}
+tasks.withType<Test>().matching { it.name == "desktopTest" }.configureEach {
+    dependsOn(generateStage3TestTls)
+    val profile = layout.buildDirectory.dir("stage3-test-profile").get().asFile
+    environment("APPDATA", profile.resolve("roaming").absolutePath)
+    environment("LOCALAPPDATA", profile.resolve("local").absolutePath)
+    environment("XDG_CONFIG_HOME", profile.resolve("config").absolutePath)
+    environment("XDG_CACHE_HOME", profile.resolve("cache").absolutePath)
+    environment("NUVIO_DESKTOP_TEST_DATA_DIR", profile.resolve("native").absolutePath)
+    systemProperty("user.home", profile.resolve("home").absolutePath)
+    systemProperty("stage3.test.keyStore", stage3TestKeyStore.get().asFile.absolutePath)
+    systemProperty("javax.net.ssl.trustStore", stage3TestKeyStore.get().asFile.absolutePath)
+    systemProperty("javax.net.ssl.trustStorePassword", "fixture-only")
+    systemProperty("javax.net.ssl.trustStoreType", "PKCS12")
+    // x64 application resources otherwise select the published Maven DLL. Use
+    // the supplied source-built DLL for both architecture-specific test runs.
+    providers.gradleProperty("nuvio.windows.quickjs.dll").orNull?.let { supplied ->
+        val dll = file(supplied)
+        inputs.file(dll)
+        systemProperty("com.dokar.quickjs.library.path", dll.parentFile.absolutePath)
+        systemProperty("com.dokar.quickjs.library.name", dll.name)
+    }
+    maxParallelForks = 1
+    val restartClasspath = layout.buildDirectory.file("stage3-test-classpath.txt").get().asFile
+    systemProperty("stage3.test.classpathFile", restartClasspath.absolutePath)
+    doFirst { restartClasspath.writeText(classpath.asPath) }
 }
 
 tasks.matching {

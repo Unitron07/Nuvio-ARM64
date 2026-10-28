@@ -64,6 +64,7 @@ internal class NativePlayerController(
     private val createWaitTimeoutMs: Long = 5_000L,
     private val releaseTimeoutMs: Long = 10_000L,
     private val onCreateWaitCompleted: () -> Unit = {},
+    private val resolveControlsPage: () -> String = { NativePlayerBridge.controlsPageUrl },
 ) : PlayerEngineController {
     private companion object {
         val json = Json { ignoreUnknownKeys = true }
@@ -312,10 +313,20 @@ internal class NativePlayerController(
                         pending.headerLines.toTypedArray(),
                         pending.playWhenReady,
                         pending.initialPositionMs,
-                        NativePlayerBridge.controlsPageUrl,
+                        resolveControlsPage(),
                         pending.decoderPriority,
                         pending.nvidiaRtxSuperResolutionEnabled,
-                        eventSink,
+                        NativePlayerEventSink { type, value ->
+                            if (type == "playbackError") {
+                                SwingUtilities.invokeLater {
+                                    if (!releaseRequested && pendingSource === pending) {
+                                        pending.onError("Playback failed (mpv error ${value.toInt()}).")
+                                    }
+                                }
+                            } else {
+                                eventSink.onPlayerEvent(type, value)
+                            }
+                        },
                     ).also { if (it == 0L) error("Native player did not return a handle.") }
                 }.onSuccess { created ->
                     val accepted = synchronized(lifecycleLock) {

@@ -1,0 +1,1 @@
+{"id":"org.nuvio.stage3.fixture","version":"1.0.0","name":"Stage 3 Local Fixture","description":"Deterministic local test content","resources":["catalog","meta","stream"],"types":["movie"],"idPrefixes":["stage3:"],"catalogs":[{"type":"movie","id":"stage3","name":"Stage 3 Local"}]}
