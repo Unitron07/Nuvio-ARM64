@@ -75,6 +75,13 @@ Linux:
 
 The shared app is built with Kotlin Multiplatform and Compose Multiplatform.
 
+## Windows ARM64 development
+
+Native ARM64 builds and the Stage 2 player runtime are available for development.
+Full application integration is still being validated. See the
+[ARM64 build notes](WINDOWS_ARM64_SURFACE.md) and
+[Stage 3 tests, evidence and Surface owner procedure](STAGE3_ARM64_VALIDATION.md).
+
 ## License
 
 [GNU General Public License v3.0](./LICENSE)

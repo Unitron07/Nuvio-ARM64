@@ -78,10 +78,9 @@ existing pinned ARM64 libmpv (SHA256
 `f90cee7e3dbb0a12fbfa6b95af1fb2bb22dbfebf8422efc0324918ee75661850`).
 This local environment has no MSVC/Windows SDK installation; the changed C++
 bridge must be compiled by native CI. No new image/UI playback is claimed from
-these tests. During development, the fresh-JVM test exposed classloader and
-Windows command-line-length assumptions; it now uses an explicit classpath file
-and Java argument files. The full final rerun passes. Native header failure was
-reproduced before the API fix.
+these tests. Fresh-JVM probes use an explicit classpath file and Java argument
+files to avoid classloader assumptions and Windows command-line length limits.
+Native header failure was reproduced before the API fix.
 
 With a native matching JDK 21, Node.js, the existing source-build prerequisites
 and a matching QuickJS-KT 1.0.15 JNI DLL:

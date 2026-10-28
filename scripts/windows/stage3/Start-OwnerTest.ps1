@@ -50,6 +50,7 @@ $overrides = @{
     JAVA_TOOL_OPTIONS=('-XX:ErrorFile="' + (Join-Path $private 'hs_err_pid%p.log') + '"');
     NUVIO_DESKTOP_SMOKE_PLAYER_URL=$null; NUVIO_DESKTOP_SMOKE_REPORT=$null
 }
+$started = [DateTime]::UtcNow
 try {
     foreach ($name in $overrides.Keys) {
         $saved[$name] = [Environment]::GetEnvironmentVariable($name, 'Process')
@@ -65,10 +66,9 @@ try {
 } finally {
     foreach ($name in $saved.Keys) { [Environment]::SetEnvironmentVariable($name, $saved[$name], 'Process') }
 }
-$started = [DateTime]::UtcNow
 $process.WaitForExit()
 $process.Refresh()
-$crashes = @(Get-ChildItem -LiteralPath $private -File -Filter 'hs_err_pid*.log')
+$crashes = @(Get-ChildItem -LiteralPath $private -File -Filter 'hs_err_pid*.log' | Where-Object LastWriteTimeUtc -ge $started)
 $events = @(Get-WinEvent -FilterHashtable @{LogName='Application'; Id=1000,1001,1002; StartTime=$started.ToLocalTime()} -ErrorAction SilentlyContinue |
     Where-Object { $_.Message -match '(?i)nuvio|player_bridge|libmpv|java' } |
     ForEach-Object { @{id=$_.Id; timeUtc=$_.TimeCreated.ToUniversalTime().ToString('o'); provider=$_.ProviderName} })

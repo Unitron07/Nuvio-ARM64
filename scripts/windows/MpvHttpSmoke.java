@@ -142,6 +142,8 @@ public class MpvHttpSmoke {
     Memory node = new Memory(16); node.clear(); node.setPointer(0, list); node.setInt(8, 7); // NODE_ARRAY
     check(lib.getFunction("mpv_set_option").invokeInt(new Object[]{handle,"http-header-fields",6,node}), "HTTP header array");
     java.lang.ref.Reference.reachabilityFence(strings);
+    java.lang.ref.Reference.reachabilityFence(values);
+    java.lang.ref.Reference.reachabilityFence(list);
   }
   static void check(int result, String action) { if (result < 0) throw new IllegalStateException(action+" failed: "+result); }
 }
