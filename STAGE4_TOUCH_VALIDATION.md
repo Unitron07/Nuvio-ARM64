@@ -17,7 +17,7 @@ momentum job; disposal cancels the pointer coroutine. Opposite-axis gestures yie
 No wheel synthesis, polling, new physics engine or global window interception.
 The NuvioTouchLazyColumn wrapper gives Settings lists the same fallback, retaining
 their states, arrangements and scrollbars. Details opts in with its existing state.
-Raw drag deltas are retained from the existing desktop fallback; same-axis nested
+Drag deltas use nested pre/post dispatch and child-first event handling; same-axis
 handoff, hero stretch/search reveal and child text/slider arbitration need focused
 hardware testing before acceptance. Mouse primary page dragging remains supported.
 

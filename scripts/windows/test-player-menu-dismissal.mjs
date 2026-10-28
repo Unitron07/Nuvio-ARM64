@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import vm from 'node:vm';
 const root = new URL('../../composeApp/src/desktopMain/resources/player-ui/', import.meta.url);
-const source = fs.readFileSync(new URL('controls.js', root), 'utf8');
+const source = fs.readFileSync(new URL('controls.js', root), 'utf8').replace(/\r\n/g, '\n');
 const start = source.indexOf('modalElements.forEach(modal => {\n  // Keep menu gestures');
 const end = source.indexOf('\nsubtitleDelayMinus.', start);
 assert.ok(start >= 0 && end > start);
