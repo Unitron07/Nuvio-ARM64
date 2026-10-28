@@ -303,6 +303,6 @@ The following screenshots show only synthetic local fixture data:
 
 | Before: controlled 503 remained Buffering | After: existing error panel |
 | --- | --- |
-| ![Before](docs/stage3/controlled-503-before-fix.jpg) | ![After](docs/stage3/controlled-503-after-fix.jpg) |
+| ![Before](https://raw.githubusercontent.com/Unitron07/Nuvio-ARM64/stage3-arm64-app-integration/docs/stage3/controlled-503-before-fix.jpg) | ![After](https://raw.githubusercontent.com/Unitron07/Nuvio-ARM64/stage3-arm64-app-integration/docs/stage3/controlled-503-after-fix.jpg) |
 
-![Actual Surface playback recovery](docs/stage3/recovery-after-terminal-error.jpg)
+![Actual Surface playback recovery](https://raw.githubusercontent.com/Unitron07/Nuvio-ARM64/stage3-arm64-app-integration/docs/stage3/recovery-after-terminal-error.jpg)
