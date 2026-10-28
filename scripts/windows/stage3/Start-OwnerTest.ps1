@@ -26,6 +26,12 @@ if (Test-Path -LiteralPath $run) {
     if (-not $Resume -or -not (Test-Path -LiteralPath $manifestPath)) { throw 'Use a new RunDirectory, or -Resume with an existing Stage 3 run.' }
     $manifest = Get-Content -LiteralPath $manifestPath -Raw | ConvertFrom-Json
     if ($manifest.schema -ne 'nuvio-stage3-v1') { throw 'Not a Stage 3 test directory.' }
+    foreach ($previousSession in @(Get-ChildItem -LiteralPath $run -File -Filter '*.session.json')) {
+        $previous = Get-Content -LiteralPath $previousSession.FullName -Raw | ConvertFrom-Json
+        if ($previous.sourceCommit -ne $imageManifest.sourceCommit -or $previous.launcherSha256 -ne $launcherHash) {
+            throw 'Cannot resume with a different image. Use a new RunDirectory to keep acceptance evidence tied to one build.'
+        }
+    }
 } else {
     if ($Resume) { throw 'Cannot resume a missing run.' }
     New-Item -ItemType Directory -Path $run | Out-Null
