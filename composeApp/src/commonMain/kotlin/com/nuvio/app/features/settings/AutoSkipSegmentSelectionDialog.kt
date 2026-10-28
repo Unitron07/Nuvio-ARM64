@@ -3,7 +3,7 @@ package com.nuvio.app.features.settings
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
-import androidx.compose.foundation.lazy.LazyColumn
+import com.nuvio.app.core.ui.NuvioTouchLazyColumn as LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier

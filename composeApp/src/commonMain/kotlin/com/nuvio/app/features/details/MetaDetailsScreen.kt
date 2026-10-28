@@ -30,6 +30,7 @@ import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.layout.statusBars
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.PaddingValues
+import com.nuvio.app.core.ui.nuvioDesktopVerticalDragScroll
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyListScope
 import androidx.compose.foundation.lazy.itemsIndexed
@@ -1295,7 +1296,7 @@ fun MetaDetailsScreen(
                         LazyColumn(
                             state = listState,
                             modifier = Modifier
-                                .fillMaxSize()
+                                .fillMaxSize().nuvioDesktopVerticalDragScroll(listState)
                                 .nestedScroll(heroStretchState.nestedScrollConnection)
                                 .zIndex(1f),
                         ) {

@@ -5,7 +5,7 @@ import path from 'node:path';
 import {fileURLToPath} from 'node:url';
 
 const root = path.join(path.dirname(fileURLToPath(import.meta.url)), 'fixtures', 'stage3');
-export async function startFixture({port = 19876, media, log, cert, key, httpsPort = 19877} = {}) {
+export async function startFixture({port = 19876, media, log, cert, key, httpsPort = 19877, tablet = false} = {}) {
   if (Boolean(cert) !== Boolean(key)) throw new Error('Supply both TLS certificate and key');
   const mediaSize = media ? fs.statSync(media).size : 0;
   let baseUrl, tlsUrl;
@@ -30,6 +30,22 @@ export async function startFixture({port = 19876, media, log, cert, key, httpsPo
       res.writeHead(status, {'Content-Type': type, 'Cache-Control': 'no-store'});
       res.end(data);
     };
+    if (tablet && route === '/manifest.json') {
+      const manifest = JSON.parse(render('manifest.json', base));
+      manifest.types = ['movie', 'series'];
+      manifest.catalogs = Array.from({length: 8}, (_, i) => ({type: i % 2 ? 'series' : 'movie', id: 'tablet-' + i, name: 'Tablet shelf ' + i}));
+      return send(200, JSON.stringify(manifest));
+    }
+    if (tablet && route.startsWith('/catalog/')) {
+      const type = route.split('/')[2];
+      return send(200, JSON.stringify({metas: Array.from({length: 40}, (_, i) => ({id: 'tablet:' + i, type, name: 'Tablet title ' + i, description: 'Synthetic scrolling fixture'}))}));
+    }
+    if (tablet && route.startsWith('/meta/')) {
+      const type = route.split('/')[2];
+      const id = decodeURIComponent(route.split('/')[3].replace(/\.json$/, ''));
+      return send(200, JSON.stringify({meta: {id, type, name: 'Tablet detail fixture', description: 'Synthetic description. '.repeat(80),
+        videos: type === 'series' ? Array.from({length: 48}, (_, i) => ({id: id + ':' + (i + 1), title: 'Episode ' + (i + 1), season: 1 + Math.floor(i / 12), episode: 1 + i % 12, released: '2026-01-01T00:00:00Z'})) : undefined}}));
+    }
     if (route === '/manifest.json') return send(200, render('manifest.json', base));
     if (route.startsWith('/catalog/')) return send(200, render('catalog.json', base));
     if (route.startsWith('/meta/')) return send(200, render('meta.json', base));
@@ -104,7 +120,7 @@ if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.me
   const options = {};
   for (let i = 2; i < process.argv.length; i += 2) {
     const name = process.argv[i].slice(2);
-    if (!['port', 'media', 'log', 'cert', 'key', 'https-port'].includes(name) || !process.argv[i + 1]) throw new Error('Invalid fixture option');
+    if (!['port', 'media', 'log', 'cert', 'key', 'https-port', 'tablet'].includes(name) || !process.argv[i + 1]) throw new Error('Invalid fixture option');
     options[name === 'https-port' ? 'httpsPort' : name] = ['port', 'https-port'].includes(name) ? Number(process.argv[i + 1]) : process.argv[i + 1];
   }
   const fixture = await startFixture(options);

@@ -70,6 +70,25 @@ class DesktopVerticalDragScrollTest {
         compose.runOnIdle { assertEquals(1, clicks) }
     }
 
+    @Test fun releaseContinuesScrollingWithFrameworkFling() {
+        setContent()
+        compose.mainClock.autoAdvance = false
+        compose.onNodeWithTag("page").performMouseInput {
+            moveTo(Offset(150f, 250f)); press()
+            moveTo(Offset(150f, 210f), delayMillis = 20)
+            moveTo(Offset(150f, 150f), delayMillis = 20)
+            moveTo(Offset(150f, 80f), delayMillis = 20); release()
+        }
+        var before = 0
+        compose.runOnIdle { before = vertical.firstVisibleItemIndex * 1000 + vertical.firstVisibleItemScrollOffset }
+        compose.mainClock.advanceTimeBy(160)
+        compose.runOnIdle {
+            assertTrue(vertical.firstVisibleItemIndex * 1000 + vertical.firstVisibleItemScrollOffset > before)
+            assertEquals(0, clicks)
+        }
+        compose.mainClock.autoAdvance = true
+    }
+
     @Test fun horizontalShelfDragDoesNotMovePage() {
         setContent()
         compose.onNodeWithTag("shelf").performMouseInput {

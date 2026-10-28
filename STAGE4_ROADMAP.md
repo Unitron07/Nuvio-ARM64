@@ -1,5 +1,9 @@
 # Stage 4: touch usability and hardening
 
+Implementation is now in progress on `stage4-arm64-touchscreen-ux`. See
+[technical plan and owner validation](STAGE4_TOUCH_VALIDATION.md). The implementation
+is not physical touchscreen acceptance; all owner checklist rows remain pending.
+
 Stage 3 core functionality is validated and ready for merge in PR #4, subject to
 final-head CI. The work below is deferred and does not block core integration.
 No release or installer distribution is authorized by Stage 3 completion.
