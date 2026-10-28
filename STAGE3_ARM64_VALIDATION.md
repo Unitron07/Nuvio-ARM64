@@ -94,8 +94,8 @@ audio/subtitle/hardware-decode behavior, real credentials and leak measurements
 are still pending. No account, provider credential or real user profile was used.
 
 Local October 27 evidence: native Microsoft ARM64 JDK 21.0.12.1+1 compiled the
-desktop application/tests and passed **100 tests in 18 suites, zero failures,
-errors or skips**. Ten tests are new Stage 3 cases; the selection also includes
+desktop application/tests and passed **101 tests in 18 suites, zero failures,
+errors or skips**. Eleven tests are new Stage 3 cases; the selection also includes
 existing plugin concurrency, teardown, debrid and playback-state regressions.
 The fixture server self-test, owner-archive privacy test, PowerShell parser checks
 and `git diff --check` pass. Real desktop HTTP/QuickJS requests pass a trusted
@@ -131,6 +131,8 @@ dependency closure, builds an app image and runs packaged native prerequisites.
 
 Coverage includes HTTP addon registration from persisted installation state,
 catalog/meta/stream parsing, addon reload/error recovery, QuickJS initialization
+and actual plugin repository refresh/relative code loading using the canonical
+`/plugins/manifest.json` fixture endpoint, alongside
 errors, async fetch/promise errors/recovery, repeated engine disposal, mock
 Real-Debrid API-key validation/resolution/401/503/cleanup/account switching,
 header/query preservation, handoff of parsed stream URLs and resume positions to
@@ -207,7 +209,7 @@ Use PowerShell 7 and Node.js. Keep a native ARM64 JDK for source tests.
    title and select its redirect/header stream. Try the direct stream and the
    controlled playback failure, then recover to a working stream. Also attempt
    installing `http://127.0.0.1:19876/malformed/manifest.json` and confirm a usable UI.
-   In plugin settings install `http://127.0.0.1:19876/plugin.json`, enable its scraper
+   In plugin settings install `http://127.0.0.1:19876/plugins/manifest.json`, enable its scraper
    and use its built-in test (or select a movie and inspect its fixture streams).
 5. For HTTPS, use authorized HTTPS content, or provide a local test certificate
    valid for 127.0.0.1 and trusted by both the JVM and mpv runtime:

@@ -16,8 +16,10 @@ test('local addon, plugin, protected redirects, queries, ranges, errors, and log
     assert.equal((await (await fetch(`${base}/manifest.json`)).json()).id, 'org.nuvio.stage3.fixture');
     assert.equal((await (await fetch(`${base}/catalog/movie/stage3.json`)).json()).metas.length, 1);
     assert.equal((await (await fetch(`${base}/meta/movie/stage3%3Avideo.json`)).json()).meta.id, 'stage3:video');
-    assert.equal((await (await fetch(`${base}/plugin.json`)).json()).scrapers[0].filename, 'scraper.js');
-    const scraper = await (await fetch(`${base}/scraper.js`)).text();
+    const pluginManifestUrl = `${base}/plugins/manifest.json`;
+    const pluginManifest = await (await fetch(pluginManifestUrl)).json();
+    assert.equal(pluginManifest.scrapers[0].filename, 'scraper.js');
+    const scraper = await (await fetch(new URL(pluginManifest.scrapers[0].filename, pluginManifestUrl))).text();
     assert.ok(scraper.includes(`${base}/stream/`));
     const {streams} = await (await fetch(`${base}/stream/movie/stage3%3Avideo.json`)).json();
     const stream = streams[0];

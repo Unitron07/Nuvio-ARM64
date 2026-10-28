@@ -40,6 +40,8 @@ internal class Stage3Fixture(private val tls: Boolean = false) : AutoCloseable {
                     exchange.requestBody.bufferedReader().readText())
                 val path = exchange.requestURI.path
                 when {
+                    path == "/plugins/manifest.json" -> reply(exchange, 200, fixture("plugin-manifest.json"))
+                    path == "/plugins/scraper.js" -> reply(exchange, 200, fixture("scraper.js"))
                     path == "/manifest.json" -> reply(exchange, manifestStatus, fixture("manifest.json"))
                     path.startsWith("/catalog/") -> reply(exchange, 200, fixture("catalog.json"))
                     path.startsWith("/meta/") -> reply(exchange, 200, fixture("meta.json"))

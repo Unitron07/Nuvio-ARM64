@@ -18,7 +18,7 @@ export async function startFixture({port = 19876, media, log, cert, key, httpsPo
     // Logs deliberately contain no URLs, queries, header values, bodies, or filenames.
     res.on('finish', () => {
       if (log) fs.appendFileSync(log, JSON.stringify({time: new Date().toISOString(),
-        method: req.method, route: ['/manifest.json', '/plugin.json', '/scraper.js', '/video', '/redirect', '/error', '/malformed/manifest.json'].includes(route)
+        method: req.method, route: ['/manifest.json', '/plugins/manifest.json', '/plugins/scraper.js', '/scraper.js', '/video', '/redirect', '/error', '/malformed/manifest.json'].includes(route)
           ? route : route.startsWith('/catalog/') ? 'catalog' : route.startsWith('/meta/') ? 'meta' : route.startsWith('/stream/') ? 'stream' : 'unknown',
         status: res.statusCode, tls: Boolean(req.socket.encrypted), range: Boolean(req.headers.range),
         fixtureAuthorization: req.headers.authorization === 'Bearer fixture-only',
@@ -42,9 +42,8 @@ export async function startFixture({port = 19876, media, log, cert, key, httpsPo
       }
       return send(200, JSON.stringify(response));
     }
-    if (route === '/plugin.json') return send(200, JSON.stringify({name: 'Stage 3 Local Plugins', version: '1.0.0',
-      scrapers: [{id: 'stage3-fixture', name: 'Stage 3 Fixture', version: '1.0.0', filename: 'scraper.js', supportedTypes: ['movie'], supportedPlatforms: ['desktop']}]}));
-    if (route === '/scraper.js') return send(200, render('scraper.js', base), 'text/javascript');
+    if (route === '/plugins/manifest.json') return send(200, render('plugin-manifest.json', base));
+    if (route === '/plugins/scraper.js' || route === '/scraper.js') return send(200, render('scraper.js', base), 'text/javascript');
     if (route === '/error') return send(503, '{"error":"controlled fixture failure"}');
     if (route === '/malformed/manifest.json') return send(200, '{malformed-fixture');
     if (route === '/redirect') {
@@ -110,7 +109,7 @@ if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.me
   }
   const fixture = await startFixture(options);
   console.log(`Addon: ${fixture.baseUrl}/manifest.json`);
-  console.log(`Plugin repository: ${fixture.baseUrl}/plugin.json`);
+  console.log(`Plugin repository: ${fixture.baseUrl}/plugins/manifest.json`);
   if (fixture.tlsUrl) console.log(`HTTPS addon: ${fixture.tlsUrl}/manifest.json`);
   for (const signal of ['SIGINT', 'SIGTERM']) process.on(signal, async () => { await fixture.close(); process.exit(0); });
 }

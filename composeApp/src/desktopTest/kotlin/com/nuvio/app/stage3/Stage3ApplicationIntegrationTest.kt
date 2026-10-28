@@ -4,6 +4,12 @@ import com.nuvio.app.features.addons.*
 import com.nuvio.app.features.details.MetaDetailsParser
 import com.nuvio.app.features.home.HomeCatalogParser
 import com.nuvio.app.features.plugins.runtime.PluginRuntime
+import com.nuvio.app.features.plugins.PluginRepository
+import com.nuvio.app.features.plugins.PluginStorage
+import com.nuvio.app.features.plugins.StoredPluginsState
+import com.nuvio.app.features.plugins.StoredPluginRepository
+import kotlinx.serialization.json.Json
+import kotlinx.serialization.encodeToString
 import com.nuvio.app.features.streams.StreamParser
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withTimeout
@@ -11,6 +17,29 @@ import kotlinx.coroutines.flow.first
 import kotlin.test.*
 
 class Stage3ApplicationIntegrationTest {
+    @Test fun installedPluginRepositoryFetchesRelativeCodeAndExecutesThroughQuickJs() = runBlocking {
+        Stage3Fixture().use { fixture ->
+            PluginRepository.clearLocalState()
+            PluginStorage.saveState(1, Json.encodeToString(StoredPluginsState(repositories = listOf(
+                StoredPluginRepository(manifestUrl = "${fixture.baseUrl}/plugins/manifest.json", name = "fixture"),
+            ))))
+            try {
+                PluginRepository.initialize()
+                val state = withTimeout(5000) {
+                    PluginRepository.uiState.first { it.scrapers.size == 1 && it.repositories.none { repo -> repo.isRefreshing } }
+                }
+                assertEquals("scraper.js", state.scrapers.single().filename)
+                assertTrue(fixture.requests.any { it.path == "/plugins/scraper.js" })
+                val streams = PluginRepository.testScraper(state.scrapers.single().id).getOrThrow()
+                assertEquals(2, streams.size)
+                assertEquals("Bearer fixture-only", streams.first().headers?.get("Authorization"))
+            } finally {
+                PluginRepository.clearLocalState()
+                PluginStorage.saveState(1, Json.encodeToString(StoredPluginsState()))
+            }
+        }
+    }
+
     @Test fun trustedHttpsAddonAndQuickJsFetchPreserveRedirectHeaders() = runBlocking {
         Stage3Fixture(tls = true).use { fixture ->
             val manifestUrl = "${fixture.baseUrl}/manifest.json"
