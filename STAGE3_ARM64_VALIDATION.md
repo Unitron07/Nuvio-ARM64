@@ -32,7 +32,7 @@ bridge initializes libmpv before loading the source. Debrid resolution uses the
 existing provider APIs and stream model; Real-Debrid supports an API-key workflow,
 not the Torbox/Premiumize device authorization workflow.
 
-Two reproducible integration defects were found:
+Three reproducible integration defects were found:
 
 1. The Windows bridge escaped both commas and backslashes into mpv's string-list
    option. The pinned mpv parser only unescapes separators, so header values with
@@ -42,6 +42,10 @@ Two reproducible integration defects were found:
 2. Native `SHGetKnownFolderPath` bypassed APPDATA/LOCALAPPDATA test isolation.
    `NUVIO_DESKTOP_TEST_DATA_DIR` now provides an explicit absolute test root for
    native WebView2/shader directories. Normal launches keep the known-folder path.
+
+3. Terminal libmpv END_FILE errors were discarded, leaving the player on
+   Buffering after a controlled HTTP 503. The bridge now forwards error reason/code
+   to the existing error UI; Kotlin ignores errors from retired or released sources.
 
 Preference writes previously truncated the active file. Saves now replace it from
 a completed temporary file (atomic move where supported; replacement fallback
@@ -85,7 +89,11 @@ JVM 21.0.11/aarch64:
   END_FILE errors without notifying Kotlin, leaving Buffering visible. The new
   bridge forwards only error reason/code events to the existing error UI;
   callbacks are bound to the active source so retired-player errors are ignored.
-  The new regression passes; retesting the corrected UI requires its new image.
+  The corrected `89a208f3` image was then tested on this Surface: the same 503
+  shows Playback error and mpv error -13, Go back restores stream selection,
+  and the direct stream visibly renders afterward. Normal application close exits
+  0 with zero new JVM crash reports and no relevant event summaries. The latest
+  `010466c9` source changes only fixtures/tests/docs after that runtime fix.
 
 These are UI-automation observations on real hardware, not fabricated owner
 results. Screenshots, safe fixture summaries and session manifests are delivered
@@ -249,17 +257,17 @@ document, not promoted into Stage 3 results.
 
 | Acceptance | Status / required evidence |
 | --- | --- |
-| Native ARM64 application launches | Pass on Surface for d25a19ab: native smoke, normal UI and exit 0; error-fix image rerun pending |
+| Native ARM64 application launches | Pass on Surface for d25a19ab and corrected 89a208f3: native smoke, normal UI and exit 0 |
 | Test addon catalog and metadata | Pass automated tests and actual Surface local-addon UI |
 | Addon stream discovery | Pass automated parser/QuickJS fetch and actual Surface stream list |
 | URLs and headers reach libmpv | Pass actual Surface HTTP/JNI route and native HTTP/HTTPS fixtures; UI HTTPS remains pending |
 | Authorized HTTP/HTTPS through actual UI | Pending owner, both protocols required |
-| Navigation and repeated playback | Two successful Surface sessions plus controlled failure/return pass; full ten-session matrix pending |
+| Navigation and repeated playback | Surface protected/direct sessions and corrected terminal-error/recovery pass; full ten-session matrix pending |
 | Settings and user state persist | Automated disk reload/corruption and fresh-JVM restart pass; full UI/cloud restart pending; secure credential storage gap above |
 | Provider automated mocks | Pass locally: existing Real-Debrid resolver through loopback HTTP; no account required |
 | Real provider validation documented | Procedure implemented; actual authentication/playback/restart/logout pending owner |
-| Existing ARM64 native CI green | All five workflows pass at d25a19ab; terminal-error follow-up CI pending |
-| Existing x64 compatibility preserved | x64 application integration and native JNI pass at d25a19ab; follow-up CI and full x64 UI pending |
+| Existing ARM64 native CI green | All five workflows pass at 010466c9, including the terminal-error fix |
+| Existing x64 compatibility preserved | x64 application integration and native JNI pass at 010466c9; full x64 UI pending |
 | Owner tools/instructions | Implemented; archive privacy/manifest tests pass locally |
 | Documentation reflects evidence | Implemented ledger; update with test reports and CI links |
 
@@ -278,3 +286,23 @@ design. Continue codec/audio/subtitle/hardware-decoding validation afterward.
 Installer/updater identity, complete native dependency licensing/source closure,
 touch redesign and performance work remain later distribution gates. No release,
 merge, updater replacement, new provider or destructive migration is included.
+
+## Final implementation CI evidence
+
+All five workflows passed for `010466c9ebef113a3e56afccdd6be04d378b9098`:
+
+- [ARM64 and x64 application integration](https://github.com/Unitron07/Nuvio-ARM64/actions/runs/40633441275).
+- [ARM64 development image, audit, HTTP/HTTPS smoke and startup](https://github.com/Unitron07/Nuvio-ARM64/actions/runs/40633441289).
+- [QuickJS ARM64 and x64](https://github.com/Unitron07/Nuvio-ARM64/actions/runs/40633441272).
+- [Native architecture checks](https://github.com/Unitron07/Nuvio-ARM64/actions/runs/40633441336).
+- [PR metadata](https://github.com/Unitron07/Nuvio-ARM64/actions/runs/40633441276).
+
+The Surface error-fix image came from [89a208f3 native CI](https://github.com/Unitron07/Nuvio-ARM64/actions/runs/40632314390),
+artifact SHA256 `c9e12b4350b3587caa3b1b0279609a6953302d57ff554c19c1370ca305e652ca`.
+The following screenshots show only synthetic local fixture data:
+
+| Before: controlled 503 remained Buffering | After: existing error panel |
+| --- | --- |
+| ![Before](docs/stage3/controlled-503-before-fix.jpg) | ![After](docs/stage3/controlled-503-after-fix.jpg) |
+
+![Actual Surface playback recovery](docs/stage3/recovery-after-terminal-error.jpg)
