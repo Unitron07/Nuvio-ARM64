@@ -1,11 +1,15 @@
 # Windows ARM64 and Surface Pro 11
 
-Status: Stage 2 native ARM64 application image, embedded local HTTP playback and
-clean shutdown were validated in merged PR #3. Stage 3 full application/addon/
-provider/navigation acceptance remains in progress. See the current
+Status: **Stage 3 core functionality validated / ready for merge.** The owner
+confirmed native launch, navigation, settings, clean exit, local addon/HTTP
+playback, account sign-in/synchronization and real debrid playback on Surface
+Pro 11. Authentication uses recovered upstream-compatible public configuration
+supplied by the ARM64 build workflow. Later account results are owner-confirmed
+on a post-authentication-fix build; its exact tested SHA is unavailable.
+[Stage 4 touch and hardening work](STAGE4_ROADMAP.md) remains deferred. See the current
 [Stage 3 plan, evidence ledger and Surface owner procedure](STAGE3_ARM64_VALIDATION.md).
 Historical investigation sections below retain their original results and dates;
-their resolved blockers do not supersede the later merged PR #3 evidence.
+the current Stage 3 ledger supersedes historical pending acceptance statements.
 Baseline: [NuvioMedia/NuvioDesktop Dev](https://github.com/NuvioMedia/NuvioDesktop/tree/5e18596aa919a6a4e7b6cdee7f90dfaabbf71b00), commit `5e18596aa919a6a4e7b6cdee7f90dfaabbf71b00`.
 Inspection: October 24–26, 2026.
 
@@ -389,7 +393,8 @@ Example, once these prerequisites exist:
 
 ```powershell
 # local.properties must exist, even if empty for compile-only tests.
-# Real playback needs the user's own service/application configuration.
+# CI supplies upstream-compatible public authentication configuration.
+# Local source builds need the documented build configuration; keep account credentials private.
 .\gradlew.bat :composeApp:verifyWindowsArm64Inputs `
   "-Pnuvio.webview2.dir=C:/deps/Microsoft.Web.WebView2/1.0.4078.44" `
   "-Pnuvio.windows.libmpv.runtimeDir=C:/deps/mpv-arm64" `
@@ -441,7 +446,7 @@ Stage 2 PRs #2 and #3 are now merged. Stage 3 work is tracked separately.
 It is not a GitHub fork-network member. This is an unofficial derivative.
 
 Before distributing binaries, include the applicable notices and corresponding
-source/build information for the app and native dependencies. The draft PR is
+source/build information for the app and native dependencies. PR #4 is
 for this user's repository. An upstream submission would require following
 upstream `CONTRIBUTING.md`, including approval and evidence where required.
 

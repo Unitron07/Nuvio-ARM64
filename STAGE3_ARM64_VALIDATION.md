@@ -1,12 +1,58 @@
 # Stage 3: application integration on Windows ARM64
 
-Stage 3 remains **in progress**. Implementation, automated evidence, native
-runtime evidence and interactive owner validation are separate gates.
-Baseline: merged `main` `bc0b30ba` (PR #3), inspected October 27, 2026.
+**Core functionality validated / ready for merge.** Existing PR #4 completes the
+core integration scope. Automated checks, earlier local-fixture evidence and
+owner-reported account results are separate evidence sources.
+Baseline: merged `main` `bc0b30ba` (PR #3). Final owner report: October 28, 2026.
 
-October 28: [authentication investigation and owner-reported 9604cd61 hardware
-results](STAGE3_AUTH_INVESTIGATION.md). Account authentication remains pending;
-the ARM64 image workflow previously omitted upstream's required build configuration.
+## Final owner validation
+
+Owner-confirmed on Microsoft Surface Pro 11 running Windows ARM64:
+
+- Native ARM64 application launches; navigation/settings work; normal exit and
+  native architecture checks pass, with no crashes observed in reported sessions.
+- Local addon installation, catalog/metadata retrieval, stream discovery, protected
+  HTTP playback, redirects/ranges and required playback-header propagation pass.
+- MKV video and audio, pause/resume, forward/backward seeking, fullscreen, return
+  to the application and repeated playback sessions pass.
+- On a **post-authentication-fix build**, Nuvio sign-in succeeds; existing account
+  content and installed addons synchronize and work; Continue Watching and
+  existing resume data appear; real debrid-provider and real media playback work
+  through the native ARM64 application.
+
+These are owner-reported hardware observations, not automatically executed CI
+tests. The exact commit of the successful account/debrid build is not established
+by available reports. Do not assign it to a guessed SHA. Earlier local-fixture
+evidence retains **9604cd61** provenance in the
+[authentication investigation](STAGE3_AUTH_INVESTIGATION.md); it is not evidence
+of configured login. No new screenshots, logs, durations or session counts are
+asserted for the final report.
+
+Authentication credit: d955a86d added build-variable wiring, missing-configuration
+detection and sanitized diagnostics. f7095b11 records recovery of upstream-
+compatible public configuration from checksum-verified upstream 0.1.33-alpha and
+supply through the ARM64 workflow. No owner discovery of authentication values
+is required. Account credentials/tokens remain private.
+
+## Deferred validation and hardening
+
+These do not block closing the core Stage 3 scope:
+
+- Ten consecutive playback-session stress test and formal memory-leak/long-duration
+  stability measurements have not been established. Repeated sessions are not a
+  ten-session stress result; no reported crashes is not a leak measurement.
+- Newly generated playback progress synchronization after restart remains
+  unverified. Existing Continue Watching/resume data appearing is a separate pass.
+- Credential-at-rest security improvements remain deferred (plain desktop
+  properties/cloud-export limitations are described below).
+- Exhaustive x64 UI regression, additional HTTPS/provider edge cases, expired
+  sessions/logout, subtitle behavior and hardware-decoder/performance validation
+  remain unverified where not explicitly covered by evidence.
+- Touch usability is tracked as Stage 4 in [issues #5–#8](STAGE4_ROADMAP.md).
+
+Historical evidence below retains its original scope and provenance. Statements
+about pending owner tests in historical observations describe that earlier session;
+the final owner report above supplies only the explicitly listed later passes.
 
 ## Inspection and implementation plan
 
@@ -23,7 +69,7 @@ the ARM64 image workflow previously omitted upstream's required build configurat
 - Protect preference saves with temporary-file replacement and discard partially
   parsed properties after a malformed file. Exercise reload and recovery.
 - Provide isolated owner launch/results tools and native/desktop CI evidence.
-  Real service sign-in, rendering and navigation remain owner acceptance gates.
+  Real service sign-in, rendering and navigation use separate owner evidence above.
 
 ## Architecture and findings
 
@@ -68,11 +114,11 @@ private. Secure credential storage needs a separately reviewed design.
 Both architectures normally share the Windows Nuvio data identity; never run the
 tests against an existing user profile. Native/JVM isolation is provided by the
 owner launcher and the desktopTest fork environment. Cloud account synchronization
-is a different persistence path and still needs a configured owner account.
+is a different persistence path, now owner-confirmed for existing account data.
 
 ## Automated tests
 
-### Local Surface application evidence
+### Historical local Surface application evidence (October 27)
 
 On October 27, the passing `d25a19ab` CI image was downloaded and its artifact
 SHA256 verified. On this Surface Pro 11, Windows ARM64 10.0.26300.0, packaged
@@ -101,9 +147,10 @@ JVM 21.0.11/aarch64:
 
 These are UI-automation observations on real hardware, not fabricated owner
 results. Screenshots, safe fixture summaries and session manifests are delivered
-with local evidence. Full HTTPS application playback, ten-session navigation,
+with local evidence. For this earlier session, full HTTPS application playback, ten-session navigation,
 audio/subtitle/hardware-decode behavior, real credentials and leak measurements
-are still pending. No account, provider credential or real user profile was used.
+were not established. The final owner report above separately confirms audio and
+real account/debrid use; other unverified cases remain deferred. No account, provider credential or real user profile was used.
 
 Local October 27 evidence: native Microsoft ARM64 JDK 21.0.12.1+1 compiled the
 desktop application/tests and passed **101 tests in 18 suites, zero failures,
@@ -182,10 +229,10 @@ Use PowerShell 7 and Node.js. Keep a native ARM64 JDK for source tests.
    For the local fixture workflow, select **Continue Without Account**. If no
    profile exists, select **Manage Profiles → Add Profile**, enter a synthetic
    name and create the local profile. No backend key is needed for this path.
-   Real account/cloud-service tests need your existing authorized configuration
-   (`NUVIO_SUPABASE_URL`, `NUVIO_SUPABASE_ANON_KEY`, and where needed `TMDB_API_KEY`
-   through the existing ignored local.properties/build mechanism). Keep those
-   values out of results and the PR. Do not update the development image through
+   ARM64 CI images now receive the recovered upstream public authentication
+   configuration through the workflow. Local source builds still need the named
+   build inputs (and `TMDB_API_KEY` where needed) through the ignored build
+   configuration mechanism. Keep values out of results and the PR. Do not update the development image through
    the upstream update banner; updater identity remains a later validation gate.
 2. In one shell, serve your own authorized, seekable video (30+ seconds is useful):
 
@@ -255,9 +302,8 @@ Use PowerShell 7 and Node.js. Keep a native ARM64 JDK for source tests.
 
 ## Owner checklist and acceptance ledger
 
-The ledger separates the named local Surface observations from the remaining
-owner matrix. PR #3's historical Surface results are retained in the ARM64
-document, not promoted into Stage 3 results.
+The ledger separates automated results, earlier local-fixture observations and
+the final owner report. PR #3 history remains in the ARM64 document.
 
 | Acceptance | Status / required evidence |
 | --- | --- |
@@ -265,33 +311,48 @@ document, not promoted into Stage 3 results.
 | Test addon catalog and metadata | Pass automated tests and actual Surface local-addon UI |
 | Addon stream discovery | Pass automated parser/QuickJS fetch and actual Surface stream list |
 | URLs and headers reach libmpv | Pass actual Surface HTTP/JNI route and native HTTP/HTTPS fixtures; UI HTTPS remains pending |
-| Authorized HTTP/HTTPS through actual UI | Pending owner, both protocols required |
+| Actual UI playback | Local protected HTTP and real account/debrid streams owner-confirmed; additional HTTPS/provider cases deferred |
 | Navigation and repeated playback | Surface protected/direct sessions and corrected terminal-error/recovery pass; full ten-session matrix pending |
-| Settings and user state persist | Automated disk reload/corruption and fresh-JVM restart pass; full UI/cloud restart pending; secure credential storage gap above |
+| Settings and user state persist | Automated disk reload/corruption/fresh-JVM restart pass; owner confirms account/addon sync and existing Continue Watching/resume data; newly generated progress after restart deferred; credential storage gap above |
 | Provider automated mocks | Pass locally: existing Real-Debrid resolver through loopback HTTP; no account required |
-| Real provider validation documented | Procedure implemented; actual authentication/playback/restart/logout pending owner |
-| Existing ARM64 native CI green | All five workflows pass at 010466c9, including the terminal-error fix |
-| Existing x64 compatibility preserved | x64 application integration and native JNI pass at 010466c9; full x64 UI pending |
+| Real account/provider validation | Owner confirms Nuvio sign-in, sync, real addons/debrid and native real-stream playback on post-authentication-fix build; exact SHA unavailable; expiry/restart/logout edge cases unverified |
+| Existing ARM64 native CI green | All five workflows pass at f7095b11, including authentication build configuration; final-head checks are recorded in PR #4 |
+| Existing x64 compatibility preserved | x64 application integration and native JNI pass at f7095b11; exhaustive x64 UI testing deferred |
 | Owner tools/instructions | Implemented; archive privacy/manifest tests pass locally |
 | Documentation reflects evidence | Implemented ledger; update with test reports and CI links |
 
-Also record audible output, subtitles, fullscreen, touch input and hardware decode
-as separate observations, not inferred passes. Check recurring JNI warnings,
+Audio and fullscreen are owner-confirmed above. Record subtitles, touch input and
+hardware decode separately, not as inferred passes. Check recurring JNI warnings,
 native crashes, stuck player threads, UI restoration and shutdown. Track memory
 over repeated sessions before claiming absence of leaks. Existing QuickJS-KT
 unchecked-exception JNI warnings remain a known upstream limitation.
 
 ## Roadmap
 
-Finish matching-architecture automated CI, then run the configured application
-owner matrix and attach results. Investigate failures before completing Stage 3.
+Stage 3 core integration is complete, subject to green final-head CI before
+removing draft status. [Stage 4 roadmap](STAGE4_ROADMAP.md) tracks the four touch
+defects and deferred validation/security work. No unperformed test is a pass.
 Resolve secure desktop credential storage separately with an approved migration
-design. Continue codec/audio/subtitle/hardware-decoding validation afterward.
+design. Continue subtitle/hardware-decoding and provider-edge validation afterward.
 Installer/updater identity, complete native dependency licensing/source closure,
 touch redesign and performance work remain later distribution gates. No release,
 merge, updater replacement, new provider or destructive migration is included.
 
-## Final implementation CI evidence
+## CI evidence
+
+Before final documentation cleanup, all five workflows passed at
+`f7095b11a375938d70d861be581c600753011542`:
+
+- [ARM64/x64 application integration and authentication tests](https://github.com/Unitron07/Nuvio-ARM64/actions/runs/40767514836).
+- [ARM64 development image, architecture audit, native lifecycle and protected HTTP/HTTPS](https://github.com/Unitron07/Nuvio-ARM64/actions/runs/40767514827).
+- [QuickJS ARM64/x64 JNI](https://github.com/Unitron07/Nuvio-ARM64/actions/runs/40767515052).
+- [PE architecture checks](https://github.com/Unitron07/Nuvio-ARM64/actions/runs/40767515061).
+- [PR metadata](https://github.com/Unitron07/Nuvio-ARM64/actions/runs/40769674032).
+
+PR #4 records final-head check results after cleanup. CI does not establish
+owner account/debrid results. No native ARM64 runtime claim is based on x64 CI.
+
+### Historical implementation CI and screenshots
 
 All five workflows passed for `010466c9ebef113a3e56afccdd6be04d378b9098`:
 

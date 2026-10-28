@@ -12,14 +12,25 @@ GET `/auth/v1/settings` with that anonymous key returned **HTTP 200**, without a
 account login. Both required repository variables have now been configured from
 those exact upstream values; the key is not reproduced in documentation/logs.
 This supersedes the earlier instruction to obtain deployment values manually.
-Successful real-account login and session restoration still require owner testing.
+The owner subsequently confirmed successful sign-in, account content and installed
+addon synchronization, existing Continue Watching/resume data, real debrid playback
+and real streams through the native ARM64 app. This resolves the earlier missing-
+configuration issue for the tested login workflow. These are owner reports, not CI
+tests. Exact account-test build SHA is unavailable: record a post-authentication-
+fix build, without assigning these results to f7095b11 or another guessed commit.
+Newly generated progress synchronization after restart, session-expiry/logout edge
+cases and exhaustive HTTPS/provider cases remain unverified.
 
 Source: https://github.com/NuvioMedia/NuvioDesktop/releases/tag/0.1.33-alpha
 
-Continue draft PR #4. No merge or release. Owner hardware results below apply to
-image **9604cd61**, not subsequent commits.
+Stage 3 core functionality is validated and ready for merge in existing PR #4.
+No merge or release is authorized here. The earlier local-fixture hardware results
+below retain their **9604cd61** provenance; the later owner account report is separate.
+Authentication implementation credit: d955a86d wired build inputs and safe missing-
+configuration diagnostics; f7095b11 documented recovery and repository configuration
+of the exact upstream public deployment values. Neither establishes the owner-test SHA.
 
-## Findings
+## Historical findings before the authentication fix
 
 The owner established DNS/TCP/HTTPS connectivity to api.nuvio.tv. This does not
 establish a working authentication request or session.
@@ -33,8 +44,8 @@ same configured Supabase-compatible client. Merely seeing api.nuvio.tv in server
 discovery policy does not configure that client.
 
 This establishes a build-configuration defect and a deterministic pre-network
-failure path. The owner's credentialed failure has not been independently
-reproduced. No claim is made that fixing configuration alone proves account login.
+failure path. The earlier credentialed failure was not independently
+reproduced; later owner testing confirms the corrected workflow succeeds. No claim is made that fixing configuration alone proves account login.
 Inspection of the downloaded 89a208f3 app JAR with javap also confirmed both
 packaged constants are empty (only empty/nonempty booleans were reported).
 The passing CI image for the owner's reported **9604cd61** commit was subsequently
@@ -71,41 +82,42 @@ stress, horizontal catalog gestures, full catalog scrolling or leak freedom.
 
 ## Stage 4 touch tracking
 
-Settings requires dragging the narrow scrollbar; normal content-area touch drag
-does not scroll. Subtitle selection has no reliably discovered touch-only dismiss
-method; Escape was needed. Settings uses shared Compose LazyColumn; player menu
-logic is shared desktop JavaScript with Escape handling. These paths are not
-ARM64-specific, but upstream hardware reproduction is still needed before calling
-either issue confirmed inherited behavior. Record as two scoped Stage 4 defects;
-no broad touch changes are included here.
+Four owner-reported usability defects are tracked in the [Stage 4 roadmap](STAGE4_ROADMAP.md):
+[Home kinetic momentum #5](https://github.com/Unitron07/Nuvio-ARM64/issues/5),
+[details touch scrolling #6](https://github.com/Unitron07/Nuvio-ARM64/issues/6),
+[Settings content scrolling #7](https://github.com/Unitron07/Nuvio-ARM64/issues/7), and
+[subtitle menu dismissal #8](https://github.com/Unitron07/Nuvio-ARM64/issues/8).
+Shared/upstream desktop paths are involved; ARM64 specificity is not established.
+These are deferred Stage 4 work, not Stage 3 core merge blockers.
 
 ## Safe retest procedure
 
-1. Obtain the official deployment URL and **publishable/anonymous client key**
-   from the upstream deployment maintainer. Do not use a service-role key, account
-   password or session token. Configure matching repository variable/secret names;
-   do not paste values into this chat or logs. Do not assume a root website URL
-   is the correct authentication service base.
+1. Use a passing ARM64 CI image with the already configured upstream public
+   deployment values. The owner does not need to discover authentication values.
+   For local source builds, supply the documented build inputs privately; never
+   substitute service-role keys, passwords or session tokens.
 2. Build the ARM64 image and owner-tools artifacts from the same commit. Record
    STAGE3_IMAGE.json sourceCommit. Start a fresh isolated RunDirectory.
 3. Owner enters their own credentials privately. If sign-in fails, report only:
    build SHA, whether the fixed missing-configuration message appeared, exception
    class from an independently reviewed/redacted excerpt, and the last completed
    stage. Do not share raw logs, account email, passwords, cookies or tokens.
-4. Verify sign-in, synchronization, session restoration after restart and logout.
-   These remain pending, along with real addons/debrid, progress persistence and
-   full UI HTTPS. Do not infer success from backend connectivity or CI.
+4. Sign-in, synchronized account/addons/existing resume data and real debrid
+   playback are now owner-confirmed. Any further tests of restart restoration,
+   newly generated progress, expired sessions, logout and additional HTTPS/provider
+   cases must be recorded separately; do not infer them from CI or earlier passes.
 
 The owner ZIP collector whitelists generated session/result/fixture summaries and
 excludes profile/private trees and raw logs. Existing privacy regression remains
 required. Desktop credential-at-rest limitations remain a separate security task.
 
-Base CI at 73d7c78c passed all five workflows. New authentication-change CI must
-be checked separately before using its image. No real account was used in tests.
+All five workflows passed at f7095b11 (including ARM64/x64 integration and QuickJS,
+ARM64 image and architecture). Final-head status is recorded in PR #4. No real
+account was used in automated tests.
 
 Local final ARM64 regression build passed **103 tests in 19 suites**, with no
 failures, errors or skips. Node fixture and owner archive privacy regressions
 pass. Configuration inspection of the matching 9604cd61 image reports both
-required values empty. Real-account login, synchronization, expired sessions,
-restart restoration and logout remain owner acceptance tests; these are not
-promoted to passes by the configuration tests.
+required values empty. Later real-account login and synchronization are owner-confirmed as described
+above, independently of these synthetic configuration tests. Expired sessions,
+restart restoration and logout are not promoted to passes.
