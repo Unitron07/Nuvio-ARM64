@@ -273,13 +273,18 @@ internal object TorboxApiClient {
         mapOf("Authorization" to "Bearer $apiKey")
 }
 
-internal object RealDebridApiClient {
-    private const val BASE_URL = "https://api.real-debrid.com/rest/1.0"
+internal val RealDebridApiClient = RealDebridClient()
+
+// Instance-scoped endpoint permits deterministic transport tests without global
+// overrides or changing the endpoint used by the application.
+internal class RealDebridClient(
+    private val baseUrl: String = "https://api.real-debrid.com/rest/1.0",
+) {
 
     suspend fun validateApiKey(apiKey: String): Boolean =
         httpRequestRaw(
             method = "GET",
-            url = "$BASE_URL/user",
+            url = "$baseUrl/user",
             headers = authHeaders(apiKey.trim()),
             body = "",
         ).status in 200..299
@@ -287,7 +292,7 @@ internal object RealDebridApiClient {
     suspend fun addMagnet(apiKey: String, magnet: String): DebridApiResponse<RealDebridAddTorrentDto> =
         formRequest(
             method = "POST",
-            url = "$BASE_URL/torrents/addMagnet",
+            url = "$baseUrl/torrents/addMagnet",
             apiKey = apiKey,
             fields = listOf("magnet" to magnet),
         )
@@ -295,14 +300,14 @@ internal object RealDebridApiClient {
     suspend fun getTorrentInfo(apiKey: String, id: String): DebridApiResponse<RealDebridTorrentInfoDto> =
         request(
             method = "GET",
-            url = "$BASE_URL/torrents/info/${encodePathSegment(id)}",
+            url = "$baseUrl/torrents/info/${encodePathSegment(id)}",
             apiKey = apiKey,
         )
 
     suspend fun selectFiles(apiKey: String, id: String, files: String): DebridApiResponse<Unit> =
         formRequest(
             method = "POST",
-            url = "$BASE_URL/torrents/selectFiles/${encodePathSegment(id)}",
+            url = "$baseUrl/torrents/selectFiles/${encodePathSegment(id)}",
             apiKey = apiKey,
             fields = listOf("files" to files),
         )
@@ -310,7 +315,7 @@ internal object RealDebridApiClient {
     suspend fun unrestrictLink(apiKey: String, link: String): DebridApiResponse<RealDebridUnrestrictLinkDto> =
         formRequest(
             method = "POST",
-            url = "$BASE_URL/unrestrict/link",
+            url = "$baseUrl/unrestrict/link",
             apiKey = apiKey,
             fields = listOf("link" to link),
         )
@@ -318,7 +323,7 @@ internal object RealDebridApiClient {
     suspend fun deleteTorrent(apiKey: String, id: String): DebridApiResponse<Unit> =
         request(
             method = "DELETE",
-            url = "$BASE_URL/torrents/delete/${encodePathSegment(id)}",
+            url = "$baseUrl/torrents/delete/${encodePathSegment(id)}",
             apiKey = apiKey,
         )
 

@@ -1,8 +1,11 @@
 # Windows ARM64 and Surface Pro 11
 
-Status: native Windows ARM64 bridge and development application image built;
-packaged native prerequisite smoke and local welcome-screen rendering passed.
-Embedded player, authenticated services and installer validation remain gates.
+Status: Stage 2 native ARM64 application image, embedded local HTTP playback and
+clean shutdown were validated in merged PR #3. Stage 3 full application/addon/
+provider/navigation acceptance remains in progress. See the current
+[Stage 3 plan, evidence ledger and Surface owner procedure](STAGE3_ARM64_VALIDATION.md).
+Historical investigation sections below retain their original results and dates;
+their resolved blockers do not supersede the later merged PR #3 evidence.
 Baseline: [NuvioMedia/NuvioDesktop Dev](https://github.com/NuvioMedia/NuvioDesktop/tree/5e18596aa919a6a4e7b6cdee7f90dfaabbf71b00), commit `5e18596aa919a6a4e7b6cdee7f90dfaabbf71b00`.
 Inspection: October 24–26, 2026.
 
@@ -378,8 +381,9 @@ DLLs. Supply an ARM64 build of QuickJS-KT's JNI bridge from the matching 1.0.15
 source, with its expected JNI exports; a generic QuickJS DLL is insufficient.
 The upstream QuickJS build has only a Windows x64 recipe. The Stage 2 build above
 adds the Microsoft-ABI ARM64 port and verifies exception/string/coroutine behavior.
-The main remaining native runtime blocker is now libmpv cleanup and dependency
-closure. Record exact source revisions and hashes for every accepted runtime.
+The merged media continuation above provides the tested ARM64 cleanup preset and
+development dependency closure. Full dependency licensing/source distribution
+closure remains a release gate. Record exact source revisions and hashes.
 
 Example, once these prerequisites exist:
 
@@ -433,7 +437,7 @@ The current release workflow remains x64; it has not been relabeled ARM64.
 The original `LICENSE`, notices, vendored licenses and upstream Git history are
 retained. This repository was initially empty and independent on GitHub; its
 `main` now contains the upstream `Dev` history and merged foundation PR #1;
-Stage 2 changes are on a separate branch.
+Stage 2 PRs #2 and #3 are now merged. Stage 3 work is tracked separately.
 It is not a GitHub fork-network member. This is an unofficial derivative.
 
 Before distributing binaries, include the applicable notices and corresponding

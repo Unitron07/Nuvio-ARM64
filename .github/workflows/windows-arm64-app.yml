@@ -5,6 +5,8 @@ on:
       - scripts/windows/**
       - composeApp/build.gradle.kts
       - composeApp/src/desktopMain/**
+      - composeApp/src/commonMain/**
+      - composeApp/src/fullCommonMain/**
       - .github/workflows/windows-arm64-app.yml
   workflow_dispatch:
 permissions:

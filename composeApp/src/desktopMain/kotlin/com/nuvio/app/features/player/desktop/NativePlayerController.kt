@@ -64,6 +64,7 @@ internal class NativePlayerController(
     private val createWaitTimeoutMs: Long = 5_000L,
     private val releaseTimeoutMs: Long = 10_000L,
     private val onCreateWaitCompleted: () -> Unit = {},
+    private val resolveControlsPage: () -> String = { NativePlayerBridge.controlsPageUrl },
 ) : PlayerEngineController {
     private companion object {
         val json = Json { ignoreUnknownKeys = true }
@@ -312,7 +313,7 @@ internal class NativePlayerController(
                         pending.headerLines.toTypedArray(),
                         pending.playWhenReady,
                         pending.initialPositionMs,
-                        NativePlayerBridge.controlsPageUrl,
+                        resolveControlsPage(),
                         pending.decoderPriority,
                         pending.nvidiaRtxSuperResolutionEnabled,
                         eventSink,

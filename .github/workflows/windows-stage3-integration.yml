@@ -1,0 +1,72 @@
+name: Windows Stage 3 application integration
+on:
+  pull_request:
+    paths:
+      - composeApp/src/commonMain/**
+      - composeApp/src/commonTest/**
+      - composeApp/src/desktopMain/**
+      - composeApp/src/desktopTest/**
+      - composeApp/src/fullCommonMain/**
+      - composeApp/build.gradle.kts
+      - scripts/windows/**
+      - STAGE3_ARM64_VALIDATION.md
+      - .github/workflows/windows-stage3-integration.yml
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  integration:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - runner: windows-11-arm
+            arch: arm64
+            javaArch: aarch64
+            osArch: aarch64
+          - runner: windows-2022
+            arch: x64
+            javaArch: x64
+            osArch: amd64
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 35
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-java@v5
+        with:
+          distribution: microsoft
+          java-version: '21'
+          architecture: ${{ matrix.javaArch }}
+      - name: Build matching native QuickJS
+        shell: pwsh
+        run: ./scripts/windows/build-quickjs.ps1 -Architecture '${{ matrix.arch }}'
+      - name: Exercise application integration on the matching JVM
+        id: tests
+        shell: pwsh
+        run: |
+          ./scripts/windows/stage3/run-tests.ps1 -QuickJsDll "build/windows-quickjs/${{ matrix.arch }}/libquickjs.dll" -ExpectedArch '${{ matrix.osArch }}'
+          ./scripts/windows/stage3/test-owner-package.ps1
+      - name: Package repeatable owner tools
+        shell: pwsh
+        run: ./scripts/windows/stage3/Pack-OwnerTools.ps1 -OutputDirectory build/stage3-owner-tools
+      - name: Record evidence scope
+        if: always()
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force build | Out-Null
+          @('SOURCE=${{ github.event.pull_request.head.sha || github.sha }}', 'ARCH=${{ matrix.osArch }}',
+            'APPLICATION_INTEGRATION=${{ steps.tests.outcome }}',
+            'Native QuickJS runs on the matching architecture. Player controller operations use fakes.',
+            'Rendered playback, HTTPS, navigation, real provider accounts and hardware decoding require separate owner evidence.') |
+            Set-Content build/STAGE3_STATUS.txt
+      - uses: actions/upload-artifact@v6
+        if: always()
+        with:
+          name: stage3-integration-${{ matrix.arch }}
+          path: |
+            composeApp/build/test-results/desktopTest/
+            composeApp/build/reports/tests/desktopTest/
+            build/STAGE3_STATUS.txt
+            build/stage3-owner-tools.zip
+          retention-days: 7
+          if-no-files-found: warn

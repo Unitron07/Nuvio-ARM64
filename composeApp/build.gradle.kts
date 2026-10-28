@@ -1304,6 +1304,7 @@ kotlin {
             implementation(libs.reorderable)
         }
         val desktopTest by getting {
+            resources.srcDir("../scripts/windows/stage3/fixtures")
             dependencies {
                 implementation(compose.desktop.uiTestJUnit4)
             }
@@ -1314,6 +1315,18 @@ kotlin {
             implementation("io.ktor:ktor-client-mock:${libs.versions.ktor.get()}")
         }
     }
+}
+
+// Tests must never read or overwrite the owner's desktop profile. Keep the
+// override in the forked JVM, leaving Gradle's own home/toolchain untouched.
+tasks.withType<Test>().matching { it.name == "desktopTest" }.configureEach {
+    val profile = layout.buildDirectory.dir("stage3-test-profile").get().asFile
+    environment("APPDATA", profile.resolve("roaming").absolutePath)
+    environment("LOCALAPPDATA", profile.resolve("local").absolutePath)
+    environment("XDG_CONFIG_HOME", profile.resolve("config").absolutePath)
+    environment("XDG_CACHE_HOME", profile.resolve("cache").absolutePath)
+    systemProperty("user.home", profile.resolve("home").absolutePath)
+    maxParallelForks = 1
 }
 
 tasks.matching {
