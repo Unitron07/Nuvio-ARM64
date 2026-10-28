@@ -1,5 +1,21 @@
 # Stage 3 authentication investigation — October 28, 2026
 
+## Official deployment configuration recovered
+
+The official upstream `NuvioMedia/NuvioDesktop` release **0.1.33-alpha** Linux
+package was inspected without executing it. Its SHA256 matches the upstream
+SHA256SUMS.txt entry:
+`15bac6dbc6b1e4291b7e53dcc95a054774559c2fad2d38810b14cf7f3f84caf1`.
+The packaged SupabaseConfig uses **https://api.nuvio.tv** and an embedded public
+anonymous JWT (`role=anon`, `iss=supabase`), not a service-role key.
+GET `/auth/v1/settings` with that anonymous key returned **HTTP 200**, without an
+account login. Both required repository variables have now been configured from
+those exact upstream values; the key is not reproduced in documentation/logs.
+This supersedes the earlier instruction to obtain deployment values manually.
+Successful real-account login and session restoration still require owner testing.
+
+Source: https://github.com/NuvioMedia/NuvioDesktop/releases/tag/0.1.33-alpha
+
 Continue draft PR #4. No merge or release. Owner hardware results below apply to
 image **9604cd61**, not subsequent commits.
 
