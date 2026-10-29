@@ -130,11 +130,24 @@ internal actual fun NuvioAsyncImage(
             }
         }
     }
-    val onState: ((AsyncImagePainter.State) -> Unit)? = remember(onLoading, onSuccess, onError) {
-        if (onLoading == null && onSuccess == null && onError == null) {
+    val requestClock = if (DesktopScrollDiagnostics.enabled) remember { longArrayOf(0L) } else null
+    val onState: ((AsyncImagePainter.State) -> Unit)? = remember(onLoading, onSuccess, onError, requestClock) {
+        if (onLoading == null && onSuccess == null && onError == null && requestClock == null) {
             null
         } else {
             { state ->
+                if (requestClock != null) {
+                    when (state) {
+                        is AsyncImagePainter.State.Loading -> requestClock[0] = System.nanoTime()
+                        is AsyncImagePainter.State.Success -> {
+                            val elapsed = if (requestClock[0] == 0L) 0L else System.nanoTime() - requestClock[0]
+                            DesktopScrollDiagnostics.counters.imageCompleted(elapsed, state.result.dataSource.toString() == "MEMORY_CACHE")
+                            requestClock[0] = 0L
+                        }
+                        is AsyncImagePainter.State.Error -> { DesktopScrollDiagnostics.counters.imageFailed(); requestClock[0] = 0L }
+                        else -> Unit
+                    }
+                }
                 when (state) {
                     is AsyncImagePainter.State.Loading -> onLoading?.invoke(state)
                     is AsyncImagePainter.State.Success -> onSuccess?.invoke(state)
@@ -200,6 +213,7 @@ private fun Image.toScaledBitmapPainter(desktopImageScaling: NuvioDesktopImageSc
 private class ScaledBitmapPainter(
     private val image: ImageBitmap,
 ) : Painter() {
+    init { if (DesktopScrollDiagnostics.enabled) DesktopScrollDiagnostics.counters.painterCreated() }
     private var cachedSize: IntSize? = null
     private var cachedBitmap: ImageBitmap? = null
     private var alpha: Float = DefaultAlpha
@@ -250,9 +264,14 @@ private class ScaledBitmapPainter(
 
     private fun scaledBitmap(size: IntSize): ImageBitmap {
         cachedBitmap?.let { bitmap ->
-            if (cachedSize == size) return bitmap
+            if (cachedSize == size) {
+                if (DesktopScrollDiagnostics.enabled) DesktopScrollDiagnostics.counters.cacheHit()
+                return bitmap
+            }
         }
+        val started = if (DesktopScrollDiagnostics.enabled) System.nanoTime() else 0L
         return image.scale(size.width, size.height).also { bitmap ->
+            if (DesktopScrollDiagnostics.enabled) DesktopScrollDiagnostics.counters.scaled(System.nanoTime() - started, size.width.toLong() * size.height * 4)
             cachedSize = size
             cachedBitmap = bitmap
         }

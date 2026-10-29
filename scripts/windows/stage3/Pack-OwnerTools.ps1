@@ -13,6 +13,7 @@ Copy-Item -LiteralPath "$repo/STAGE3_ARM64_VALIDATION.md" -Destination $output
 Copy-Item -LiteralPath "$repo/STAGE3_AUTH_INVESTIGATION.md" -Destination $output
 Copy-Item -LiteralPath "$repo/STAGE4_ROADMAP.md" -Destination $output
 Copy-Item -LiteralPath "$repo/STAGE4_TOUCH_VALIDATION.md" -Destination $output
+Copy-Item -LiteralPath "$repo/STAGE4_PERFORMANCE.md" -Destination $output
 $zip = "$output.zip"
-Compress-Archive -LiteralPath (Join-Path $output 'scripts'),(Join-Path $output 'STAGE3_ARM64_VALIDATION.md'),(Join-Path $output 'STAGE3_AUTH_INVESTIGATION.md'),(Join-Path $output 'STAGE4_ROADMAP.md'),(Join-Path $output 'STAGE4_TOUCH_VALIDATION.md') -DestinationPath $zip
+Compress-Archive -LiteralPath (Join-Path $output 'scripts'),(Join-Path $output 'STAGE3_ARM64_VALIDATION.md'),(Join-Path $output 'STAGE3_AUTH_INVESTIGATION.md'),(Join-Path $output 'STAGE4_ROADMAP.md'),(Join-Path $output 'STAGE4_TOUCH_VALIDATION.md'),(Join-Path $output 'STAGE4_PERFORMANCE.md') -DestinationPath $zip
 Write-Host "Owner tools: $zip (application image and authorized media supplied separately)"

@@ -7,6 +7,7 @@ import {fileURLToPath} from 'node:url';
 const root = path.join(path.dirname(fileURLToPath(import.meta.url)), 'fixtures', 'stage3');
 export async function startFixture({port = 19876, media, log, cert, key, httpsPort = 19877, tablet = false, artwork = false} = {}) {
   if (Boolean(cert) !== Boolean(key)) throw new Error('Supply both TLS certificate and key');
+  const posters = artwork ? Array.from({length: 24}, (_, i) => fs.readFileSync(path.join(root, 'artwork', i + '.jpg'))) : [];
   const mediaSize = media ? fs.statSync(media).size : 0;
   let baseUrl, tlsUrl;
   const servers = [];
@@ -30,7 +31,11 @@ export async function startFixture({port = 19876, media, log, cert, key, httpsPo
       res.writeHead(status, {'Content-Type': type, 'Cache-Control': 'no-store'});
       res.end(data);
     };
-    if (artwork && /^\/tablet-poster\/\d+\.jpg$/.test(route)) return send(200, fs.readFileSync(path.join(root, 'tablet-artwork.jpg')), 'image/jpeg');
+    if (artwork && /^\/tablet-poster\/\d+\.jpg$/.test(route)) {
+      const index = Number(route.match(/\d+/)[0]) % posters.length;
+      res.writeHead(200, {'Content-Type':'image/jpeg', 'Cache-Control':'public, max-age=3600'});
+      return res.end(posters[index]);
+    }
     if (tablet && route === '/manifest.json') {
       const manifest = JSON.parse(render('manifest.json', base));
       manifest.types = ['movie', 'series'];
@@ -39,7 +44,8 @@ export async function startFixture({port = 19876, media, log, cert, key, httpsPo
     }
     if (tablet && route.startsWith('/catalog/')) {
       const type = route.split('/')[2];
-      return send(200, JSON.stringify({metas: Array.from({length: 40}, (_, i) => ({id: 'tablet:' + i, type, name: 'Tablet title ' + i, description: 'Synthetic scrolling fixture with artwork and metadata', poster: artwork ? base + '/tablet-poster/' + i + '.jpg' : undefined, releaseInfo: '2026', imdbRating: '8.0'}))}));
+      const shelf = Number(route.match(/tablet-(\d+)/)?.[1] || 0);
+      return send(200, JSON.stringify({metas: Array.from({length: 40}, (_, i) => ({id: 'tablet:' + i, type, name: 'Tablet title ' + i + ' — A Longer Synthetic Catalog Title', genres: ['Adventure','Drama'], description: 'Synthetic scrolling fixture with artwork and metadata', poster: artwork ? base + '/tablet-poster/' + (shelf * 40 + i) + '.jpg' : undefined, releaseInfo: '2026', imdbRating: '8.0'}))}));
     }
     if (tablet && route.startsWith('/meta/')) {
       const type = route.split('/')[2];

@@ -1,5 +1,9 @@
 # Stage 4: touch usability and hardening
 
+Real-catalog rendering remains the major owner-observed issue after successful
+touch follow-up. See [performance investigation](STAGE4_PERFORMANCE.md) for the
+evidence gap, non-speculative diagnostic build and controlled owner comparisons.
+
 Implementation is now in progress on `stage4-arm64-touchscreen-ux`. See
 [technical plan and owner validation](STAGE4_TOUCH_VALIDATION.md). The implementation
 is not physical touchscreen acceptance; all owner checklist rows remain pending.

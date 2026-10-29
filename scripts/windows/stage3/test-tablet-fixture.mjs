@@ -12,6 +12,12 @@ try {
   const poster = await fetch(catalog.metas[0].poster);
   assert.equal(poster.headers.get('content-type'), 'image/jpeg');
   assert.ok((await poster.arrayBuffer()).byteLength > 10000);
+  const first = Buffer.from(await (await fetch(catalog.metas[0].poster)).arrayBuffer());
+  const different = Buffer.from(await (await fetch(catalog.metas[1].poster)).arrayBuffer());
+  assert.notDeepEqual(first, different);
+  assert.match(poster.headers.get('cache-control'), /max-age=3600/);
+  const otherShelf = await get('/catalog/series/tablet-3.json');
+  assert.notEqual(catalog.metas[0].poster, otherShelf.metas[0].poster);
   assert.equal((await get('/stream/movie/tablet%3A0.json')).streams.length, 80);
   const {meta} = await get('/meta/series/tablet%3A0.json');
   assert.equal(meta.id, 'tablet:0');

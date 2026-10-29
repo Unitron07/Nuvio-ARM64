@@ -18,10 +18,13 @@ try {
     if ($LASTEXITCODE -ne 0) { throw 'Fixture self-test failed.' }
     & node scripts/windows/stage3/test-tablet-fixture.mjs
     if ($LASTEXITCODE -ne 0) { throw 'Tablet fixture self-test failed.' }
+    & node scripts/windows/stage3/test-scroll-metrics.mjs
+    if ($LASTEXITCODE -ne 0) { throw 'Scroll metrics analyzer test failed.' }
     & ./gradlew.bat :composeApp:desktopTest `
         --tests 'com.nuvio.app.stage3.*' `
         --tests 'com.nuvio.app.core.ui.DesktopVerticalDragScrollTest' `
         --tests 'com.nuvio.app.core.ui.StreamListTouchTest' `
+        --tests 'com.nuvio.app.core.ui.ScrollDiagnosticsTest' `
         --tests 'com.nuvio.app.core.storage.DesktopStorageTest' `
         --tests 'com.nuvio.app.features.plugins.PluginRuntimeDesktopTest' `
         --tests 'com.nuvio.app.features.player.desktop.NativePlayerControllerTeardownTest' `

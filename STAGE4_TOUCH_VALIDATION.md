@@ -1,5 +1,10 @@
 # Stage 4 technical plan and Surface validation
 
+Current performance work: [real-catalog investigation and v2 diagnostic procedure](STAGE4_PERFORMANCE.md).
+The v2 procedure supersedes the older v1 probe instructions below. Owner now
+confirms short flicks and source dragging; controlled real-catalog performance
+attribution remains pending. No rendering speedup is claimed.
+
 Status: implementation in draft; physical touchscreen acceptance is pending.
 
 ## Surface follow-up report and focused retest
