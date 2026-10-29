@@ -45,4 +45,12 @@ class ScaledArtworkCacheTest {
         assertFailsWith<IllegalArgumentException> { cache.getOrCreate(a, 1, 0, 2) { Any() } }
         cache.clear(); assertEquals(0, cache.size)
     }
+    @Test fun tinyImagesCannotGrowMetadataBeyondEntryLimit() {
+        val cache = ScaledArtworkCache<Any>(1_000_000, maxEntries = 2)
+        val sources = List(100) { Any() }
+        sources.forEach { cache.getOrCreate(it, 1, 1, 1) { Any() } }
+        assertEquals(2, cache.size)
+        assertEquals(8L, cache.retainedBytes)
+        assertFailsWith<IllegalArgumentException> { ScaledArtworkCache<Any>(1, maxEntries = 0) }
+    }
 }

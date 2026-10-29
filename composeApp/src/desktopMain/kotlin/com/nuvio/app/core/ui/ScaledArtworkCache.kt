@@ -3,7 +3,8 @@ package com.nuvio.app.core.ui
 import java.lang.ref.WeakReference
 
 /** Retains scaled results across painter disposal, not decoded sources or URLs. */
-internal class ScaledArtworkCache<T : Any>(private val budgetBytes: Long) {
+internal class ScaledArtworkCache<T : Any>(private val budgetBytes: Long, private val maxEntries: Int = 256) {
+    init { require(budgetBytes >= 0 && maxEntries > 0) }
     private class Key(source: Any, val revision: Int, val width: Int, val height: Int) {
         val source = WeakReference(source)
         private val identityHash = System.identityHashCode(source)
@@ -35,7 +36,7 @@ internal class ScaledArtworkCache<T : Any>(private val budgetBytes: Long) {
         }
         val value = create()
         if (bytes > budgetBytes) return value
-        while (retainedBytes + bytes > budgetBytes && entries.isNotEmpty()) {
+        while ((retainedBytes + bytes > budgetBytes || entries.size >= maxEntries) && entries.isNotEmpty()) {
             val eldest = entries.iterator()
             retainedBytes -= eldest.next().value.bytes; eldest.remove()
         }

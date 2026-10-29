@@ -74,6 +74,7 @@ On a painter cache miss, consult a shared desktop scaled-result LRU:
   individual entries bypass retention. Oldest unused entries are evicted; hits
   update LRU order. Dead weak sources and superseded generations are pruned on
   insertion/miss. Decoded sources are weakly referenced and not kept alive here.
+  A separate 256-entry cap bounds metadata even for tiny icons.
 - Active painters can keep their own references after eviction. Never close an
   evicted bitmap still in use by a painter/GPU. Reference release/Skia cleanup uses
   existing JVM/native ownership. The 64 MiB cap is cache-owned retention, not a cap
