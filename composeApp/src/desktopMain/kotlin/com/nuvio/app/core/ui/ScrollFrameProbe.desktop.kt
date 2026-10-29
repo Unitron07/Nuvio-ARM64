@@ -28,7 +28,9 @@ internal class FrameIntervals {
 internal actual fun Modifier.nuvioScrollFrameProbe(state: LazyListState): Modifier {
     val path = DesktopScrollDiagnostics.target ?: return this
     return composed {
+        if (!LocalScreenActive.current) return@composed Modifier
         LaunchedEffect(path, state) {
+            val probeId = DesktopScrollDiagnostics.nextProbeId()
             val collectors = ManagementFactory.getGarbageCollectorMXBeans()
             fun gcCount() = collectors.sumOf { it.collectionCount.coerceAtLeast(0) }
             fun gcTime() = collectors.sumOf { it.collectionTime.coerceAtLeast(0) }
@@ -41,14 +43,23 @@ internal actual fun Modifier.nuvioScrollFrameProbe(state: LazyListState): Modifi
             var collections = gcCount()
             var collectionMs = gcTime()
             while (true) {
-                val active = FrameIntervals()
+                val vertical = FrameIntervals()
+                val horizontal = FrameIntervals()
+                val mixed = FrameIntervals()
                 val idle = FrameIntervals()
                 repeat(300) {
                     val now = withFrameNanos { it }
                     val moved = index != state.firstVisibleItemIndex || offset != state.firstVisibleItemScrollOffset
                     // Raw promoted-pointer drags do not set isScrollInProgress.
                     // Visible offset movement also covers wheel and raw drag paths.
-                    (if (moved || state.isScrollInProgress) active else idle).add(now - previous)
+                    val outerMoving = moved || state.isScrollInProgress
+                    val shelfMoving = ShelfScrollDiagnostics.sampleHorizontal()
+                    (when {
+                        outerMoving && shelfMoving -> mixed
+                        outerMoving -> vertical
+                        shelfMoving -> horizontal
+                        else -> idle
+                    }).add(now - previous)
                     previous = now
                     index = state.firstVisibleItemIndex
                     offset = state.firstVisibleItemScrollOffset
@@ -58,7 +69,7 @@ internal actual fun Modifier.nuvioScrollFrameProbe(state: LazyListState): Modifi
                 val delta = current.indices.map { current[it] - work[it] }
                 val nextCollections = gcCount()
                 val nextCollectionMs = gcTime()
-                val record = "{\"schema\":\"nuvio-frame-v2\",\"fromMs\":$fromMs,\"toMs\":$toMs,\"active\":${active.json()},\"idle\":${idle.json()},\"work\":{\"painters\":${delta[0]},\"scaleHits\":${delta[1]},\"scaleMisses\":${delta[2]},\"scaleNs\":${delta[3]},\"scaledBytes\":${delta[4]},\"imageCompletions\":${delta[5]},\"imageLatencyNs\":${delta[6]},\"imageMemoryHits\":${delta[7]},\"imageErrors\":${delta[8]},\"scaleWorstNs\":${current[9]},\"imageLatencySamples\":${delta[10]},\"gcCollections\":${nextCollections - collections},\"gcMs\":${nextCollectionMs - collectionMs}}}\n"
+                val record = "{\"schema\":\"nuvio-frame-v3\",\"probe\":$probeId,\"fromMs\":$fromMs,\"toMs\":$toMs,\"vertical\":${vertical.json()},\"horizontal\":${horizontal.json()},\"mixed\":${mixed.json()},\"idle\":${idle.json()},\"work\":{\"painters\":${delta[0]},\"scaleHits\":${delta[1]},\"scaleMisses\":${delta[2]},\"scaleNs\":${delta[3]},\"scaledBytes\":${delta[4]},\"imageCompletions\":${delta[5]},\"imageLatencyNs\":${delta[6]},\"imageMemoryHits\":${delta[7]},\"imageErrors\":${delta[8]},\"scaleWorstNs\":${current[9]},\"imageLatencySamples\":${delta[10]},\"gcCollections\":${nextCollections - collections},\"gcMs\":${nextCollectionMs - collectionMs},\"sharedScaleHits\":${delta[11]},\"shelfEntries\":${delta[12]},\"shelfDisposals\":${delta[13]},\"cacheBudgetBytes\":$scaledArtworkCacheBudgetBytes}}\n"
                 withContext(Dispatchers.IO) {
                     runCatching { Files.writeString(path, record, StandardOpenOption.CREATE, StandardOpenOption.APPEND) }
                 }

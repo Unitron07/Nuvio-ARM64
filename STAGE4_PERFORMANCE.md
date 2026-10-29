@@ -1,5 +1,8 @@
 # Stage 4: real-catalog performance investigation
 
+Current revision: [verified v2 evidence, bounded scale reuse and v3 A/B procedure](STAGE4_VERTICAL_SCROLLING.md).
+The diagnostic-only/missing-recording statements below describe the prior revision.
+
 Status: diagnostic build, draft PR #9. No rendering optimization or performance
 improvement is claimed. Real-catalog stutter remains unresolved pending attribution.
 Touch slop, velocity/decay, native player, authentication and debrid code are unchanged.

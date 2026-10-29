@@ -2,6 +2,7 @@ package com.nuvio.app.core.ui
 
 import java.nio.file.Path
 import java.util.concurrent.atomic.AtomicLongArray
+import java.util.concurrent.atomic.AtomicLong
 
 /** Numeric process-wide counters only. Never accepts image models/URLs/errors. */
 internal object DesktopScrollDiagnostics {
@@ -12,10 +13,12 @@ internal object DesktopScrollDiagnostics {
     val enabled: Boolean = target != null
     val originNs: Long = System.nanoTime()
     val counters = ScrollWorkCounters()
+    private val probeIds = AtomicLong()
+    fun nextProbeId() = probeIds.incrementAndGet()
 }
 
 internal class ScrollWorkCounters {
-    private val values = AtomicLongArray(11)
+    private val values = AtomicLongArray(14)
     fun painterCreated() { values.incrementAndGet(0) }
     fun cacheHit() { values.incrementAndGet(1) }
     fun scaled(nanos: Long, bytes: Long) {
@@ -29,5 +32,8 @@ internal class ScrollWorkCounters {
         if (nanos > 0) values.incrementAndGet(10)
     }
     fun imageFailed() { values.incrementAndGet(8) }
-    fun snapshot(): LongArray = LongArray(11) { values.get(it) }
+    fun sharedScaleHit() { values.incrementAndGet(11) }
+    fun shelfEntered() { values.incrementAndGet(12) }
+    fun shelfDisposed() { values.incrementAndGet(13) }
+    fun snapshot(): LongArray = LongArray(14) { values.get(it) }
 }

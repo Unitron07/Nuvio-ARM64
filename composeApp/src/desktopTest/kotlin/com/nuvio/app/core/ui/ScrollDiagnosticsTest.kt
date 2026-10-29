@@ -13,7 +13,7 @@ class ScrollDiagnosticsTest {
         counters.imageCompleted(0, true) // cache completion without a loading callback
         counters.imageCompleted(20_000_000, false)
         counters.imageFailed()
-        assertContentEquals(longArrayOf(1, 2, 2, 41_000_000, 1_422_400, 2, 20_000_000, 1, 1, 40_000_000, 1), counters.snapshot())
+        assertContentEquals(longArrayOf(1, 2, 2, 41_000_000, 1_422_400, 2, 20_000_000, 1, 1, 40_000_000, 1, 0, 0, 0), counters.snapshot())
         assertContentEquals(counters.snapshot(), counters.snapshot()) // reads do not drain other probes
     }
     @Test fun frameBucketsKeepWeightedDurationsAndThresholds() {

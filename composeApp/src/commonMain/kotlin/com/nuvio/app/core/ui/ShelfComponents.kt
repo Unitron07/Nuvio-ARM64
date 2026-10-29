@@ -95,6 +95,7 @@ fun <T> NuvioShelfSection(
     val duplicateSafeEntries = remember(entries, key) {
         key?.let { entries.withDuplicateSafeLazyKeys(it) }
     }
+    ObserveShelfScroll(state)
 
     ScreenActivityEffect(state) { active ->
         if (!active) state.stopScroll()

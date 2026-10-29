@@ -1,5 +1,8 @@
 # Stage 4: touch usability and hardening
 
+Current performance revision: [bounded scaled-artwork reuse and v3 direction profiling](STAGE4_VERTICAL_SCROLLING.md).
+New Surface optimization results remain pending; horizontal/gesture behavior is preserved.
+
 Real-catalog rendering remains the major owner-observed issue after successful
 touch follow-up. See [performance investigation](STAGE4_PERFORMANCE.md) for the
 evidence gap, non-speculative diagnostic build and controlled owner comparisons.

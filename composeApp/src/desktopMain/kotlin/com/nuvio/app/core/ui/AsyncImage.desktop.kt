@@ -42,6 +42,10 @@ import kotlin.math.roundToInt
 private const val MinCustomDownscaleRatio = 1.08f
 private const val MaxDesktopSourceSizePx = 1536
 private const val MaxScaledBitmapPixels = 1_250_000L
+// Additional scaled-result retention, independent of Coil's decoded-source cache.
+internal val scaledArtworkCacheBudgetBytes =
+    if (System.getenv("NUVIO_SHARED_ARTWORK_CACHE") == "off") 0L else 64L * 1024 * 1024
+internal val scaledArtworkCache = ScaledArtworkCache<ImageBitmap>(scaledArtworkCacheBudgetBytes)
 
 private val IsWindowsDesktop: Boolean =
     System.getProperty("os.name")
@@ -204,14 +208,14 @@ private fun Any?.withDesktopImageOptions(
 private fun Image.toScaledBitmapPainter(desktopImageScaling: NuvioDesktopImageScaling): Painter? {
     if (desktopImageScaling == NuvioDesktopImageScaling.Disabled) return null
 
-    return (this as? BitmapImage)
-        ?.bitmap
-        ?.asComposeImageBitmap()
-        ?.let { imageBitmap -> ScaledBitmapPainter(imageBitmap) }
+    return (this as? BitmapImage)?.bitmap?.let { bitmap ->
+        ScaledBitmapPainter(bitmap.asComposeImageBitmap(), bitmap)
+    }
 }
 
-private class ScaledBitmapPainter(
+internal class ScaledBitmapPainter(
     private val image: ImageBitmap,
+    private val source: Bitmap,
 ) : Painter() {
     init { if (DesktopScrollDiagnostics.enabled) DesktopScrollDiagnostics.counters.painterCreated() }
     private var cachedSize: IntSize? = null
@@ -262,16 +266,22 @@ private class ScaledBitmapPainter(
         return true
     }
 
-    private fun scaledBitmap(size: IntSize): ImageBitmap {
+    internal fun scaledBitmap(size: IntSize): ImageBitmap {
         cachedBitmap?.let { bitmap ->
             if (cachedSize == size) {
                 if (DesktopScrollDiagnostics.enabled) DesktopScrollDiagnostics.counters.cacheHit()
                 return bitmap
             }
         }
-        val started = if (DesktopScrollDiagnostics.enabled) System.nanoTime() else 0L
-        return image.scale(size.width, size.height).also { bitmap ->
-            if (DesktopScrollDiagnostics.enabled) DesktopScrollDiagnostics.counters.scaled(System.nanoTime() - started, size.width.toLong() * size.height * 4)
+        var created = false
+        return scaledArtworkCache.getOrCreate(source, source.generationId, size.width, size.height) {
+            created = true
+            val started = if (DesktopScrollDiagnostics.enabled) System.nanoTime() else 0L
+            image.scale(size.width, size.height).also {
+                if (DesktopScrollDiagnostics.enabled) DesktopScrollDiagnostics.counters.scaled(System.nanoTime() - started, size.width.toLong() * size.height * 4)
+            }
+        }.also { bitmap ->
+            if (!created && DesktopScrollDiagnostics.enabled) DesktopScrollDiagnostics.counters.sharedScaleHit()
             cachedSize = size
             cachedBitmap = bitmap
         }

@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import {summarize} from './analyze-scroll-metrics.mjs';
+import {summarize,listProbes} from './analyze-scroll-metrics.mjs';
 const bucket = (frames, totalNs, maxNs, over16ms = 0, over33ms = 0) => ({frames,totalNs,maxNs,over16ms,over33ms});
 const legacy = {...bucket(2, 40e6, 30e6, 1),schema:'nuvio-frame-v1', privateUrl:'must-not-share'};
 const second = {...bucket(1, 50e6, 50e6, 1, 1),schema:'nuvio-frame-v1'};
@@ -16,4 +16,16 @@ assert.equal(summarize(JSON.stringify(window),{fromMs:120001}).selectedRecords,0
 assert.equal(summarize([legacy,second].map(JSON.stringify).join('\n'),{skipRecords:1}).frames,1);
 assert.throws(() => summarize(JSON.stringify({...legacy,frames:-1})), /numeric/);
 assert.throws(() => summarize('private-invalid-url'), /Invalid JSON at record 1/);
+const v3 = {schema:'nuvio-frame-v3',probe:1,fromMs:0,toMs:3000,vertical:bucket(2,80e6,60e6,1,1),horizontal:bucket(3,30e6,10e6),mixed:bucket(0,0,0),idle:bucket(1,10e6,10e6),work:{...work,sharedScaleHits:30,shelfEntries:4,shelfDisposals:2,cacheBudgetBytes:67108864}};
+assert.equal(summarize(JSON.stringify(v3),{mode:'vertical'}).averageMs,40);
+assert.equal(summarize(JSON.stringify(v3),{mode:'horizontal'}).averageMs,10);
+assert.equal(summarize(JSON.stringify(v3),{mode:'active'}).frames,5);
+assert.equal(summarize(JSON.stringify(v3)).workWholeWindows.sharedScaleHits,30);
+assert.throws(() => summarize(JSON.stringify(window),{mode:'vertical'}), /cannot distinguish/);
 console.log('PASS: weighted v1/v2 analysis, active/idle, setup exclusion, validation and privacy');
+
+const multiple = [v3,{...v3,probe:2}].map(JSON.stringify).join('\n');
+assert.throws(() => summarize(multiple), /Multiple probes/);
+assert.equal(summarize(multiple,{probe:1}).selectedRecords,1);
+assert.equal(listProbes(multiple).length,2);
+assert.equal(summarize([window,window].map(JSON.stringify).join('\n')).overlappingWindows,1);
