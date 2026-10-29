@@ -1,9 +1,16 @@
 # Stage 4: touch usability and hardening
 
+Latest owner report: vertical catalog scrolling is improved, horizontal shelves
+are smooth, and source/Settings/menu/playback touch work succeeds. Exact tested
+SHA was not supplied. Stage 4 is in final cleanup for expanded grids, Discover
+genre scrolling and accidental sidebar expansion. See
+[final cleanup and Surface checklist](STAGE4_FINAL_TOUCH_CLEANUP.md).
+New physical acceptance remains pending; historical investigation notes follow.
+
 Current performance revision: [bounded scaled-artwork reuse and v3 direction profiling](STAGE4_VERTICAL_SCROLLING.md).
 New Surface optimization results remain pending; horizontal/gesture behavior is preserved.
 
-Real-catalog rendering remains the major owner-observed issue after successful
+Real-catalog rendering was the major owner-observed issue after the earlier
 touch follow-up. See [performance investigation](STAGE4_PERFORMANCE.md) for the
 evidence gap, non-speculative diagnostic build and controlled owner comparisons.
 

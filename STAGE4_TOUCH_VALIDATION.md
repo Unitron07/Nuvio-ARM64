@@ -1,5 +1,11 @@
 # Stage 4 technical plan and Surface validation
 
+Final cleanup: [expanded grids, Discover genre popup and sidebar intent](STAGE4_FINAL_TOUCH_CLEANUP.md).
+The latest owner reports improved real-catalog vertical scrolling and successful
+prior touch/playback fixes. Only the three cleanup items are newly pending;
+older per-revision pending checklists below are historical, not a rejection of
+the owner's later observations. Exact tested SHA was not supplied.
+
 Latest: [vertical shelf re-entry optimization and direction-specific retest](STAGE4_VERTICAL_SCROLLING.md).
 
 Current performance work: [real-catalog investigation and v2 diagnostic procedure](STAGE4_PERFORMANCE.md).

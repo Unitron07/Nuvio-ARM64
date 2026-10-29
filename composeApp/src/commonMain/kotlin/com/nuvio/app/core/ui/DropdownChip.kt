@@ -2,6 +2,8 @@ package com.nuvio.app.core.ui
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.gestures.Orientation
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -91,10 +93,13 @@ fun NuvioDropdownChip(
         }
 
         if (isDesktop) {
+            val menuScrollState = rememberScrollState()
             DropdownMenu(
                 expanded = isSheetVisible,
                 onDismissRequest = { isSheetVisible = false },
-                modifier = Modifier.widthIn(min = 180.dp, max = 360.dp),
+                modifier = Modifier.widthIn(min = 180.dp, max = 360.dp)
+                    .nuvioDesktopAxisDragScroll(menuScrollState, Orientation.Vertical),
+                scrollState = menuScrollState,
                 containerColor = tokens.colors.surfacePopover,
                 shape = tokens.shapes.compactCard,
             ) {
