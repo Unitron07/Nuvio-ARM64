@@ -40,12 +40,16 @@ sequences. The chevron uses existing localized Expand/Collapse strings.
 ## Automated coverage and limits
 
 TouchCleanupTest exercises grid dragging without item activation and subsequent
-tap, actual dropdown dragging/selection, sidebar entry/click suppression,
+tap, actual dropdown dragging/tap and keyboard selection, sidebar entry/click suppression,
 deliberate mouse expansion, route departure/return reset and expansion policies.
 The Stage 3 runner includes these alongside existing drag/fling, wheel, nested
 scroll, source-list, menu/keyboard, image-cache, auth, playback and privacy checks.
 Synthetic desktop input is not physical touchscreen acceptance. Check real popup
 outside dismissal, keyboard traversal, rail geometry and Back on the Surface.
+An attempted Escape test did not reach popup dismissal even with an explicitly
+focused option: Compose installs that callback on the scene layer, while the
+content input injector targets the owner. It is not counted as passing coverage;
+the final test verifies Enter activation, and native Escape remains pending.
 
 ## Matching image and tools
 

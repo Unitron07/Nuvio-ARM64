@@ -13,6 +13,7 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.input.key.Key
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.SemanticsProperties
+import androidx.compose.ui.semantics.SemanticsActions
 import androidx.compose.ui.test.*
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.unit.dp
@@ -64,8 +65,12 @@ class TouchCleanupTest {
         compose.runOnIdle { assertEquals("70",selected) }
         compose.onNodeWithText("Genre 70").assertDoesNotExist()
         compose.onNodeWithText("Choose genre").performClick()
-        compose.onNode(hasScrollAction()).performKeyInput { pressKey(Key.Escape) }
-        compose.onNodeWithText("Genre 70").assertDoesNotExist()
+        // Content-level keyboard activation. Native popup-layer Escape is an owner check.
+        compose.onNodeWithText("Genre 71").performScrollTo()
+            .performSemanticsAction(SemanticsActions.RequestFocus)
+        compose.onNodeWithText("Genre 71").performKeyInput { pressKey(Key.Enter) }
+        compose.runOnIdle { assertEquals("71", selected) }
+        compose.onNodeWithText("Genre 71").assertDoesNotExist()
     }
 
     @Test fun sidebarEnterClickAndRouteReturnDoNotExpandButMouseIntentDoes() {
