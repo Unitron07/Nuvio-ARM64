@@ -21,6 +21,7 @@ try {
     & ./gradlew.bat :composeApp:desktopTest `
         --tests 'com.nuvio.app.stage3.*' `
         --tests 'com.nuvio.app.core.ui.DesktopVerticalDragScrollTest' `
+        --tests 'com.nuvio.app.core.ui.StreamListTouchTest' `
         --tests 'com.nuvio.app.core.storage.DesktopStorageTest' `
         --tests 'com.nuvio.app.features.plugins.PluginRuntimeDesktopTest' `
         --tests 'com.nuvio.app.features.player.desktop.NativePlayerControllerTeardownTest' `

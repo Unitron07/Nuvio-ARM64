@@ -1,6 +1,82 @@
 # Stage 4 technical plan and Surface validation
 
 Status: implementation in draft; physical touchscreen acceptance is pending.
+
+## Surface follow-up report and focused retest
+
+Owner reports successful sign-in, addon/catalog sync, real debrid/native video and
+audio, touch menu dismissal, most navigation, Settings dragging, smooth horizontal
+shelves and basic vertical Home scrolling. Exact tested SHA was not supplied.
+The reported mpv -13 case was an unavailable third-party addon; subsequent real
+debrid playback succeeded. No media/authentication/provider fix is warranted.
+All NEW follow-up retest rows below remain pending, rather than overriding those
+earlier owner observations.
+
+Confirmed source gap: the tablet/desktop source overlays both call StreamList,
+whose independent LazyColumn lacked the Stage 4 wrapper. It now uses that shared
+wrapper, preserving list state/keys, filters, refresh callbacks and scrollbar.
+The desktop recognizer also discarded cumulative pre-slop movement and applied
+only the last event at recognition. It now consumes only cumulative movement
+beyond slop; duplicate-timestamp move/up samples no longer distort velocity fitting.
+These are demonstrated code defects; their contribution to the owner's subjective
+short-flick behavior requires retesting. Framework velocity fitting/decay remains.
+
+Performance inspection: real posters use NuvioAsyncImage and Coil with a 256 MiB
+desktop memory cache; poster request models and duplicate-safe lazy keys/content
+types are remembered. Windows high-quality requests can decode up to 1536px;
+ScaledBitmapPainter allocates/scales a bitmap synchronously on first draw or size
+cache miss, then caches it per painter. Real cards also add depth, text and overlays.
+The prior text-only fixture omits these image paths. This identifies plausible
+costs, NOT a measured bottleneck. Network/decode, UI composition, GPU/upload,
+draw-time scaling and GC have not been apportioned. No visual-quality reduction
+or speculative rendering optimization is claimed; no before/after performance
+numbers are available yet.
+
+Run `fixture.mjs --tablet true --artwork true --media C:/NuvioTests/authorized.mp4`
+for network-loaded 480x720 JPEG posters, normal poster cards and metadata; omit
+`--artwork true` for the text control. Tablet mode now supplies 80 selectable
+protected local sources. Images are generated benchmark artwork, not real catalog
+content; compare the owner's same real catalog separately.
+
+Optional aggregate probe (Home/shared NuvioScreen only), before launching:
+
+```powershell
+$env:NUVIO_SCROLL_METRICS_FILE='C:/NuvioTests/artwork-cold-frames.jsonl'
+# Launch with the normal isolated Start-OwnerTest -Resume procedure below.
+# Close normally when finished, then clear the opt-in variable:
+Remove-Item Env:NUVIO_SCROLL_METRICS_FILE
+```
+
+Use a new absolute metrics filename per run. The disabled probe has no frame loop
+or file I/O. Enabled sampling awaits Compose frame-clock callbacks; every 300
+intervals it writes only frame count, total/max nanoseconds and counts above
+16.67/33.33ms, on Dispatchers.IO. No identifiers, timestamps, URLs or account data
+are recorded. These are callback pacing proxies, NOT GPU-presented frame counts,
+actual dropped frames or measured input latency. Sampling itself can affect pacing.
+It does not profile decode/network/GC; use a local JVM profiler if needed, keeping
+raw profiles private because they may contain URLs. The owner ZIP collector does
+not automatically include metrics or arbitrary profiles.
+
+Compare 30 seconds of the same gesture sequence, viewport, scaling, refresh rate,
+window size and power mode: text fixture, cold artwork, warm artwork, then the
+same real catalog cold/warm. Record build SHA and those settings separately in the
+sanitized checklist. Keep probes enabled equally for comparisons; discard partial
+windows/navigation transitions and compare average (`totalNs / frames`), maximum
+and over-budget proportions. Do not compare old non-instrumented builds as if
+they supplied metrics. A future measured rendering optimization can use these same
+conditions for before/after results. Preserve original image quality throughout.
+
+- [ ] Synthetic Home short/long flicks, stop on new press, top/bottom boundaries.
+- [ ] Artwork fixture and identical real catalog cold/warm pacing comparisons.
+- [ ] Horizontal shelves, movie/TV details, Settings and nested controls.
+- [ ] 80-source selector dragging/momentum, card tap versus drag, filters/refresh.
+- [ ] Subtitle/audio dismissal, real debrid playback and mouse/keyboard/trackpad.
+
+Automated additions exercise short flick continuation/interruption and the actual
+StreamList with 80 real StreamCard composables (drag must not select; tap must).
+Fixture tests verify JPEG loading and source count. These are not physical tests
+or proof that real-artwork scrolling is faster. Commit-specific results and
+matching artifact links are recorded in draft PR #9.
 Baseline: merged Stage 3 PR #4, main e6b05536. Issues: #5, #6, #7, #8.
 
 ## Root causes and implementation

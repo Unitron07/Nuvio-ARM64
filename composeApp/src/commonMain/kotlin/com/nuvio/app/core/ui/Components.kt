@@ -92,7 +92,7 @@ fun NuvioScreen(
     ) {
         LazyColumn(
             state = listState,
-            modifier = Modifier.fillMaxSize().nuvioDesktopVerticalDragScroll(listState),
+            modifier = Modifier.fillMaxSize().nuvioDesktopVerticalDragScroll(listState).nuvioScrollFrameProbe(),
             contentPadding = PaddingValues(
                 start = horizontalPadding,
                 top = topPadding ?: tokens.spacing.screenTop + statusBarTop + nuvioPlatformExtraTopPadding,

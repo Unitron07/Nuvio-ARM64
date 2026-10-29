@@ -25,6 +25,7 @@ import androidx.compose.ui.input.pointer.isPrimaryPressed
 import androidx.compose.ui.input.pointer.pointerInput
 import com.nuvio.app.isDesktop
 import kotlin.math.abs
+import kotlin.math.sign
 
 /**
  * AWT promotes Windows touchscreen input to mouse events. Compose's normal touch
@@ -55,6 +56,7 @@ internal fun Modifier.nuvioDesktopAxisDragScroll(state: ScrollableState, axis: O
             momentum?.cancel()
             val velocity = VelocityTracker()
             velocity.addPosition(down.uptimeMillis, down.position)
+            var lastSampleTime = down.uptimeMillis
             var released = false
             var dx = 0f
             var dy = 0f
@@ -63,7 +65,12 @@ internal fun Modifier.nuvioDesktopAxisDragScroll(state: ScrollableState, axis: O
                 val event = awaitPointerEvent(PointerEventPass.Main)
                 val change = event.changes.firstOrNull { it.id == down.id } ?: break
                 if (change.isConsumed) break
-                velocity.addPosition(change.uptimeMillis, change.position)
+                // Some promoted move/up events have identical timestamps. A
+                // duplicate stationary up sample must not distort the fit.
+                if (change.uptimeMillis > lastSampleTime) {
+                    velocity.addPosition(change.uptimeMillis, change.position)
+                    lastSampleTime = change.uptimeMillis
+                }
                 if (!change.pressed) { released = true; break }
                 if (!event.buttons.isPrimaryPressed) break
                 val delta = change.position - change.previousPosition
@@ -71,12 +78,16 @@ internal fun Modifier.nuvioDesktopAxisDragScroll(state: ScrollableState, axis: O
                 dy += delta.y
                 val along = if (axis == Orientation.Vertical) dy else dx
                 val across = if (axis == Orientation.Vertical) dx else dy
+                var dragDelta = if (axis == Orientation.Vertical) delta.y else delta.x
                 if (!dragging) {
                     if (abs(across) > viewConfiguration.touchSlop && abs(across) > abs(along)) break
                     if (abs(along) <= viewConfiguration.touchSlop || abs(along) <= abs(across)) continue
                     dragging = true
+                    // Apply all movement beyond slop, rather than only the last
+                    // packet. Short gestures may cross slop in very few events.
+                    dragDelta = along - sign(along) * viewConfiguration.touchSlop
                 }
-                val available = vector(if (axis == Orientation.Vertical) delta.y else delta.x)
+                val available = vector(dragDelta)
                 val remaining = available - dispatcher.dispatchPreScroll(available, NestedScrollSource.UserInput)
                 val consumed = vector(-state.dispatchRawDelta(-component(remaining)))
                 dispatcher.dispatchPostScroll(consumed, remaining - consumed, NestedScrollSource.UserInput)

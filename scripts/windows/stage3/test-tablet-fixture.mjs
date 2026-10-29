@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import {startFixture} from './fixture.mjs';
-const fixture = await startFixture({port: 0, tablet: true});
+const fixture = await startFixture({port: 0, tablet: true, artwork: true});
 try {
   const get = async path => (await fetch(fixture.baseUrl + path)).json();
   const manifest = await get('/manifest.json');
@@ -9,6 +9,10 @@ try {
   const catalog = await get('/catalog/series/tablet-1.json');
   assert.equal(catalog.metas.length, 40);
   assert.equal(new Set(catalog.metas.map(x => x.id)).size, 40);
+  const poster = await fetch(catalog.metas[0].poster);
+  assert.equal(poster.headers.get('content-type'), 'image/jpeg');
+  assert.ok((await poster.arrayBuffer()).byteLength > 10000);
+  assert.equal((await get('/stream/movie/tablet%3A0.json')).streams.length, 80);
   const {meta} = await get('/meta/series/tablet%3A0.json');
   assert.equal(meta.id, 'tablet:0');
   assert.equal(meta.videos.length, 48);

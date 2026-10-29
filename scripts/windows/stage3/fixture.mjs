@@ -5,7 +5,7 @@ import path from 'node:path';
 import {fileURLToPath} from 'node:url';
 
 const root = path.join(path.dirname(fileURLToPath(import.meta.url)), 'fixtures', 'stage3');
-export async function startFixture({port = 19876, media, log, cert, key, httpsPort = 19877, tablet = false} = {}) {
+export async function startFixture({port = 19876, media, log, cert, key, httpsPort = 19877, tablet = false, artwork = false} = {}) {
   if (Boolean(cert) !== Boolean(key)) throw new Error('Supply both TLS certificate and key');
   const mediaSize = media ? fs.statSync(media).size : 0;
   let baseUrl, tlsUrl;
@@ -30,6 +30,7 @@ export async function startFixture({port = 19876, media, log, cert, key, httpsPo
       res.writeHead(status, {'Content-Type': type, 'Cache-Control': 'no-store'});
       res.end(data);
     };
+    if (artwork && /^\/tablet-poster\/\d+\.jpg$/.test(route)) return send(200, fs.readFileSync(path.join(root, 'tablet-artwork.jpg')), 'image/jpeg');
     if (tablet && route === '/manifest.json') {
       const manifest = JSON.parse(render('manifest.json', base));
       manifest.types = ['movie', 'series'];
@@ -38,7 +39,7 @@ export async function startFixture({port = 19876, media, log, cert, key, httpsPo
     }
     if (tablet && route.startsWith('/catalog/')) {
       const type = route.split('/')[2];
-      return send(200, JSON.stringify({metas: Array.from({length: 40}, (_, i) => ({id: 'tablet:' + i, type, name: 'Tablet title ' + i, description: 'Synthetic scrolling fixture'}))}));
+      return send(200, JSON.stringify({metas: Array.from({length: 40}, (_, i) => ({id: 'tablet:' + i, type, name: 'Tablet title ' + i, description: 'Synthetic scrolling fixture with artwork and metadata', poster: artwork ? base + '/tablet-poster/' + i + '.jpg' : undefined, releaseInfo: '2026', imdbRating: '8.0'}))}));
     }
     if (tablet && route.startsWith('/meta/')) {
       const type = route.split('/')[2];
@@ -51,6 +52,7 @@ export async function startFixture({port = 19876, media, log, cert, key, httpsPo
     if (route.startsWith('/meta/')) return send(200, render('meta.json', base));
     if (route.startsWith('/stream/')) {
       const response = JSON.parse(render('stream.json', base));
+      if (tablet) response.streams = Array.from({length: 80}, (_, i) => ({...response.streams[0], name: 'Fixture source ' + (i + 1), title: '1080p • Local authorized media • Multi-line source metadata ' + (i + 1)}));
       if (tlsUrl && base === baseUrl) {
         const stream = JSON.parse(render('stream.json', tlsUrl)).streams[0];
         stream.name = 'Stage 3 HTTPS redirect + headers';
@@ -120,7 +122,7 @@ if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.me
   const options = {};
   for (let i = 2; i < process.argv.length; i += 2) {
     const name = process.argv[i].slice(2);
-    if (!['port', 'media', 'log', 'cert', 'key', 'https-port', 'tablet'].includes(name) || !process.argv[i + 1]) throw new Error('Invalid fixture option');
+    if (!['port', 'media', 'log', 'cert', 'key', 'https-port', 'tablet', 'artwork'].includes(name) || !process.argv[i + 1]) throw new Error('Invalid fixture option');
     options[name === 'https-port' ? 'httpsPort' : name] = ['port', 'https-port'].includes(name) ? Number(process.argv[i + 1]) : process.argv[i + 1];
   }
   const fixture = await startFixture(options);

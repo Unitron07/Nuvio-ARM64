@@ -104,6 +104,29 @@ class DesktopVerticalDragScrollTest {
         }
     }
 
+    @Test fun shortFlickContinuesAndNewPressStopsMomentum() {
+        setContent()
+        compose.mainClock.autoAdvance = false
+        compose.onNodeWithTag("page").performMouseInput {
+            moveTo(Offset(150f, 240f)); press()
+            moveTo(Offset(150f, 230f), delayMillis = 10)
+            moveTo(Offset(150f, 215f), delayMillis = 10)
+            moveTo(Offset(150f, 195f), delayMillis = 10); release()
+        }
+        var before = 0
+        fun position() = vertical.firstVisibleItemIndex * 1000 + vertical.firstVisibleItemScrollOffset
+        compose.runOnIdle { before = position() }
+        compose.mainClock.advanceTimeBy(96)
+        compose.runOnIdle { assertTrue(position() > before); assertEquals(0, clicks) }
+        compose.onNodeWithTag("page").performMouseInput { moveTo(Offset(150f, 240f)); press() }
+        compose.mainClock.advanceTimeBy(32)
+        compose.runOnIdle { before = position() }
+        compose.mainClock.advanceTimeBy(160)
+        compose.runOnIdle { assertEquals(before, position()) }
+        compose.onNodeWithTag("page").performMouseInput { release() }
+        compose.mainClock.autoAdvance = true
+    }
+
     @Test fun secondaryButtonDragDoesNotScrollPage() {
         setContent()
         compose.onNodeWithTag("page").performMouseInput {
