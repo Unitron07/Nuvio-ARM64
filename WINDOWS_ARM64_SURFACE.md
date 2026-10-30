@@ -1,9 +1,19 @@
 # Windows ARM64 and Surface Pro 11
 
-Status: **Core touchscreen UX validated on Surface Pro 11 — ready for merge, subject to final checks.**
+Status: **Initial ARM64 hardware acceleration and diagnostic validation complete.
+Advanced performance, battery and long-duration stability work deferred.**
+The owner accepts the narrower Stage 5 milestone and authorizes PR #10 ready for
+review after final checks; the owner will merge manually. This is not full
+optimization, completion of every original criterion or public-release readiness.
+Stage 4 PR #9 merged at `2f71f1c8a4585457427c540ec2de3cc260768d72`.
+See [Stage 5 decoder findings](STAGE5_HARDWARE_DECODING.md),
+[performance/power methodology](STAGE5_ARM64_PERFORMANCE.md) and
+[Surface owner results/instructions](STAGE5_SURFACE_VALIDATION.md). Owner b62e5550
+evidence establishes embedded AV1 1080p D3D11VA and a clean approximately five-minute
+session; expanded endurance, power and new-progress validation remain deferred.
 See [Stage 4 final validation](STAGE4_FINAL_VALIDATION.md) for the owner's tested
 scrolling, menu/navigation and integration paths, cache A/B observations, automated
-evidence and nonblocking limits. PR #9 remains unmerged; the owner will merge manually.
+evidence and nonblocking limits. Historical readiness statements below retain their dates.
 
 Stage 3 PR #4 is merged. Native launch/exit, account/addon sync, existing resume data
 and real debrid video/audio remain owner-confirmed. Authentication uses the existing
@@ -12,6 +22,28 @@ storage change is part of Stage 4. Exact owner hardware-tested SHA was not suppl
 See the [Stage 3 ledger](STAGE3_ARM64_VALIDATION.md) and [remaining roadmap](STAGE4_ROADMAP.md).
 Historical sections below retain original results/dates and pending statements;
 the final Stage 4 ledger supersedes those historical core-touch acceptance statements.
+
+## Current development roadmap
+
+| Stage | Accepted result |
+| --- | --- |
+| 1 | Windows ARM64 foundation complete |
+| 2 | Native dependency/runtime support complete |
+| 3 | Application integration and real playback complete |
+| 4 | Touchscreen UX and scrolling complete in the validated paths |
+| 5 | Initial hardware-decoding validation and performance diagnostics complete under the owner-approved narrower scope |
+
+Future hardening remains uncompleted: [#11 endurance/resource growth](https://github.com/Unitron07/Nuvio-ARM64/issues/11),
+[#12 full codec/HDR/fallback matrix](https://github.com/Unitron07/Nuvio-ARM64/issues/12),
+[#13 controlled CPU/GPU/battery work](https://github.com/Unitron07/Nuvio-ARM64/issues/13),
+[#14 new progress/account/debrid validation](https://github.com/Unitron07/Nuvio-ARM64/issues/14),
+and [#15 QuickJS JNI hardening](https://github.com/Unitron07/Nuvio-ARM64/issues/15).
+These do not automatically block the accepted initial Stage 5 milestone.
+
+Separate release gates remain open: security/credential-at-rest and export hardening;
+native dependency licensing/corresponding-source closure; a native Windows ARM64
+installer; fork-specific updater/application identity; and public alpha release
+validation. None is implemented or waived by PR #10. Keep them outside this PR.
 
 Baseline: [NuvioMedia/NuvioDesktop Dev](https://github.com/NuvioMedia/NuvioDesktop/tree/5e18596aa919a6a4e7b6cdee7f90dfaabbf71b00), commit `5e18596aa919a6a4e7b6cdee7f90dfaabbf71b00`.
 Inspection: October 24–26, 2026.

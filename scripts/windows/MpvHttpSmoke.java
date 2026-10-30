@@ -75,7 +75,9 @@ public class MpvHttpSmoke {
     server.start();
     try (NativeLibrary lib = NativeLibrary.getInstance(Path.of(args[0]).toAbsolutePath().toString(),
         Map.of(Library.OPTION_OPEN_FLAGS, 0x1100))) {
-      for (int cycle = 0; cycle < 3; cycle++) {
+      int cycles = Integer.getInteger("mpv.http.cycles", 3);
+      if (cycles < 1 || cycles > 100) throw new IllegalArgumentException("cycles must be 1..100");
+      for (int cycle = 0; cycle < cycles; cycle++) {
       Pointer handle = lib.getFunction("mpv_create").invokePointer(new Object[]{});
       if (handle == null) throw new IllegalStateException("mpv_create failed");
       try {

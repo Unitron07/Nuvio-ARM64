@@ -1,5 +1,12 @@
 # Stage 4: touch usability and hardening
 
+Stage 4 PR #9 is merged. Stage 5 initial hardware-decoding/diagnostic validation is
+owner-accepted under its narrower scope; advanced investigations are deferred in
+[#11–#15](WINDOWS_ARM64_SURFACE.md#current-development-roadmap).
+See [Stage 5](STAGE5_ARM64_PERFORMANCE.md), with
+[owner instructions](STAGE5_SURFACE_VALIDATION.md). The historical Stage 4 readiness
+and acceptance evidence below is preserved.
+
 **Core touchscreen UX validated on Surface Pro 11 — ready for merge, subject to final checks.**
 
 The owner confirms Home/shelves, natural short swipes/momentum, tested details,

@@ -3,12 +3,18 @@ param(
     [Parameter(Mandatory=$true)][string]$RunDirectory,
     [switch]$Resume,
     [switch]$NativeSmoke,
-    [switch]$FixtureLogs
+    [switch]$FixtureLogs,
+    [switch]$PlaybackDiagnostics,
+    [switch]$PerformanceMetrics
 )
 $ErrorActionPreference = 'Stop'
 Set-StrictMode -Version Latest
 $image = (Resolve-Path -LiteralPath $ImageDirectory).Path
 $run = [IO.Path]::GetFullPath($RunDirectory)
+$preferencesHelper=Join-Path $PSScriptRoot 'test-preferences.jar'
+if (-not (Test-Path -LiteralPath $preferencesHelper)) {
+    throw 'Use packaged owner tools with test-preferences.jar; APPDATA redirection alone does not isolate the Windows SDK session store.'
+}
 if (-not [Runtime.InteropServices.RuntimeInformation]::OSArchitecture.Equals([Runtime.InteropServices.Architecture]::Arm64)) {
     throw 'Owner testing requires native ARM64 Windows.'
 }
@@ -54,8 +60,13 @@ $overrides = @{
     APPDATA=(Join-Path $run 'profile/roaming'); LOCALAPPDATA=(Join-Path $run 'profile/local');
     WEBVIEW2_USER_DATA_FOLDER=(Join-Path $run 'profile/webview2');
     NUVIO_DESKTOP_TEST_DATA_DIR=(Join-Path $run 'profile/native');
-    JAVA_TOOL_OPTIONS=('-Duser.home="' + (Join-Path $run 'profile/home') + '" -XX:ErrorFile="' + (Join-Path $private 'hs_err_pid%p.log') + '"');
+    JAVA_TOOL_OPTIONS=('-Duser.home="' + (Join-Path $run 'profile/home') +
+        '" -XX:ErrorFile="' + (Join-Path $private 'hs_err_pid%p.log') +
+        '" -Xbootclasspath/a:"' + $preferencesHelper +
+        '" -Djava.util.prefs.PreferencesFactory=nuvio.testing.IsolatedPreferencesFactory -Dnuvio.test.preferences="' +
+        (Join-Path $run 'profile/preferences') + '"');
     NUVIO_DESKTOP_SMOKE_PLAYER_URL=$null; NUVIO_DESKTOP_SMOKE_REPORT=$null
+    NUVIO_PLAYBACK_DIAGNOSTICS=$(if ($PlaybackDiagnostics) { Join-Path $private "$session.playback.jsonl" } else { $null })
 }
 $started = [DateTime]::UtcNow
 $stdoutTarget = $null
@@ -90,7 +101,25 @@ try {
 } finally {
     foreach ($name in $saved.Keys) { [Environment]::SetEnvironmentVariable($name, $saved[$name], 'Process') }
 }
-$process.WaitForExit()
+if ($PerformanceMetrics) {
+    . "$PSScriptRoot/ProcessMetrics.ps1"
+    $metricsPath = Join-Path $private "$session.metrics.jsonl"
+    $previousCpu = @{}
+    $previousTime = $started
+    while (-not $process.WaitForExit(1000)) {
+        try {
+            $tree=Get-NuvioProcessTreeMetrics -RootProcessId $process.Id -PreviousCpu $previousCpu
+            $now = [DateTime]::UtcNow
+            $interval = ($now - $previousTime).TotalSeconds
+            [ordered]@{elapsedSeconds=($now-$started).TotalSeconds;
+                cpuPercent=100*$tree.cpuSeconds/$interval/[Environment]::ProcessorCount;
+                workingSetBytes=$tree.workingSetBytes; privateBytes=$tree.privateBytes;
+                handles=$tree.handles; threads=$tree.threads; processCount=$tree.processCount; scope=$tree.scope} |
+                ConvertTo-Json -Compress | Add-Content -LiteralPath $metricsPath
+            $previousTime=$now
+        } catch { } # Optional measurement failure must not interrupt the owner session.
+    }
+} else { $process.WaitForExit() }
 try {
     [void]$stdoutDrain.GetAwaiter().GetResult()
     [void]$stderrDrain.GetAwaiter().GetResult()
