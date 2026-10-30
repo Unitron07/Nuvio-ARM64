@@ -6,6 +6,7 @@ if (Test-Path -LiteralPath $output) { throw 'Choose a new output directory.' }
 $scripts = Join-Path $output 'scripts/windows'
 New-Item -ItemType Directory -Path $scripts -Force | Out-Null
 Copy-Item -LiteralPath $PSScriptRoot -Destination (Join-Path $scripts 'stage3') -Recurse
+& "$PSScriptRoot/Build-TestPreferences.ps1" -JarPath (Join-Path $scripts 'stage3/test-preferences.jar')
 foreach ($name in @('audit-arm64-image.ps1','verify-pe-architecture.ps1','make-smoke-avi.py')) {
     Copy-Item -LiteralPath (Join-Path "$repo/scripts/windows" $name) -Destination $scripts
 }

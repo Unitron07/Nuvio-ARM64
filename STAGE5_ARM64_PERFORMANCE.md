@@ -7,6 +7,16 @@ in STAGE4_FINAL_VALIDATION.md with their original uncontrolled-workload limitati
 
 ## Implemented measurement support
 
+Owner testing exposed an inherited isolation defect: Supabase's default Java
+Preferences session backend can restore the normal Windows account even when
+APPDATA/user.home point at a fresh profile. The new **owner-only** JVM preferences
+factory bypasses the Windows registry, stores test sessions within profile/preferences
+and preserves them across restart. Missing helper/invalid roots fail closed.
+Normal application/authentication code remains unchanged. Synthetic fresh-JVM
+write/read/remove/root-separation tests pass; a packaged Surface launch with the
+helper shows the unauthenticated welcome screen and closes normally. Earlier toolkit
+isolation claims did not cover this SDK session backend; use the updated toolkit.
+
 - Opt-in actual-player decoder/timing/drop diagnostics, sanitized at the native
   boundary; unavailable numeric properties are null.
 - Isolated owner launcher samples application process-tree CPU, working set, private bytes,

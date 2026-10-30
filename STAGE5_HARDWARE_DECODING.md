@@ -82,6 +82,19 @@ fullscreen, header propagation, DLL ownership and P2P unsupported guard are pres
 
 ## Short physical standalone decoder results (October 30, 2026)
 
+Additional embedded-player evidence at source `7058b5f077438f17519047f2744f00b581527c12`:
+the locally compiled application's PlatformPlayerSurface smoke screen, using that
+head's CI-built JNI bridge (SHA256 `d3bb9d8d10de547abde83130dfc836c5c545d63cda93f542e3f0fedf79a325c3`),
+visibly rendered generated silent 1080p H.264 with `hwdec-current=d3d11va` and
+`pixelFormat=d3d11`. Across approximately 84 seconds including pauses/UI checks:
+67 samples, 38 qualifying progressing hardware intervals, zero sampled VO/decoder
+drops, no playback-error event, and initialization/destruction-return markers.
+K pause/resume, F11 fullscreen entry/exit, slider backward seek and resumed advancement
+were observed. Normal Alt-F4 removed the window; process exit code was not retained.
+This is actual application player-surface/JNI/WebView2 evidence, separate from full
+catalog/navigation, packaged-image playback, audio/HDR, ten-session or long-duration
+acceptance. Remaining matrix rows below are still pending for those full workflows.
+
 On this Microsoft Surface Pro 11, Snapdragon X1P64100, Qualcomm Adreno X1-85 driver
 31.0.170.0, Windows ARM64 10.0.26300.0 and Microsoft ARM64 JDK 21.0.12.1+1,
 the pinned libmpv DLL (SHA256 `f90cee7e3dbb0a12fbfa6b95af1fb2bb22dbfebf8422efc0324918ee75661850`)

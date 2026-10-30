@@ -1,5 +1,13 @@
 # Stage 3: application integration on Windows ARM64
 
+**Stage 5 owner-tool correction:** the historical APPDATA/user.home isolation below
+did not cover Supabase's default Java Preferences session backend on Windows. Use
+the updated packaged tools with test-preferences.jar; the owner-only JVM factory
+bypasses the normal registry backend and stores test sessions in the isolated profile.
+See [current owner instructions](STAGE5_SURFACE_VALIDATION.md). Normal production
+authentication/session storage remains unchanged. Do not use older toolkit ZIPs
+when account isolation is required.
+
 **Core functionality validated / ready for merge.** Existing PR #4 completes the
 core integration scope. Automated checks, earlier local-fixture evidence and
 owner-reported account results are separate evidence sources.

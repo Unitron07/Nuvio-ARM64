@@ -24,7 +24,16 @@ Use native ARM64 Windows. From the extracted owner-tools directory, in PowerShel
 ```
 
 The Stage 3 isolation/audit/manifest infrastructure is reused. No personal profile
-is copied. Console output is discarded unless explicitly requested through the
+is intentionally copied. **Use the updated packaged tools containing
+scripts/windows/stage3/test-preferences.jar.** Earlier APPDATA/user.home isolation
+did not cover Supabase's default Java Preferences session backend on Windows; a
+fresh test directory could restore the normal account and synchronize its data.
+The owner-only JVM preferences factory now stores user/system Preferences under
+RunDirectory/profile/preferences, bypassing the registry entirely. Missing helper
+or invalid isolation configuration fails closed. Production launch/auth code and
+normal session storage are unchanged. Isolated test sessions persist across -Resume;
+their plain preference files must remain private. Do not use earlier owner-tool ZIPs
+for real-account isolation. Console output is discarded unless explicitly requested through the
 older fixture-only launcher. The Stage 5 launcher enables native diagnostic files
 and process metrics; raw data stays in private/. Profile/ and private/ stay local.
 Inspect processScopes and processCount: the sampler follows the packaged launcher's
