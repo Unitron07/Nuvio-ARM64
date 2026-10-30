@@ -10,10 +10,14 @@ Baseline: main `2f71f1c8a4585457427c540ec2de3cc260768d72`, merged Stage 4 PR #9.
 
 The owner tested matching image/tools at `b62e5550781aa52b2f70bb8602283c9e026eb975`
 on Surface Pro 11 / Snapdragon X / Windows ARM64, using the privacy-safe diagnostics.
-The owner supplied a summary of stage5-safe-results.json and stage3-owner-results(3).zip
-for this finalization. Those raw files were not attached to this finalization request;
-the values below are owner-supplied observations, not a new independent replay or
-recalculation. Private profiles, media identifiers and raw archives are not committed.
+The owner supplied stage5-safe-results.json and stage3-owner-results.zip during
+finalization. Their aggregate JSON and generated application-session manifest were
+independently inspected; source/architecture/exit/crash fields and the figures below
+agree with the owner's summary. [Sanitized owner evidence and input hashes](docs/stage5/owner-surface-results.json)
+preserve provenance. Raw per-sample playback logs were not supplied or recalculated;
+hardware playback was not repeated during finalization. Private profiles, media
+identifiers and raw archives are not committed. The archive's legacy checklist remains
+pending; explicit owner milestone acceptance is recorded separately.
 
 | Field | Owner observation |
 | --- | --- |

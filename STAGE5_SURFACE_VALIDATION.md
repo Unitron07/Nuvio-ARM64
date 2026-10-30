@@ -9,11 +9,15 @@ hardening, not unperformed tests presented as passes or automatic merge blockers
 ## Owner acceptance and evidence provenance
 
 The owner tested matching Stage 5 ARM64 image/tools at
-`b62e5550781aa52b2f70bb8602283c9e026eb975`. The supplied summary of
-stage5-safe-results.json and stage3-owner-results(3).zip reports approximately five
-minutes of full-application use. The raw files were not attached to this finalization
-request; no new independent raw-file calculation, recording or hardware replay is
-claimed. Keep private profiles/raw archives out of the repository.
+`b62e5550781aa52b2f70bb8602283c9e026eb975`. The supplied stage5-safe-results.json and
+stage3-owner-results.zip were independently inspected during finalization. The
+aggregate JSON and generated application-session manifest agree with the owner
+summary; measured duration is 311.70 seconds (approximately five minutes twelve
+seconds). [Sanitized numeric evidence/input hashes](docs/stage5/owner-surface-results.json)
+are committed. Raw per-sample telemetry was not supplied/recalculated and hardware
+testing was not repeated. The legacy archive checklist is still pending; explicit
+owner acceptance of the narrower milestone is recorded separately. Keep private
+profiles/raw archives and media/account identifiers out of the repository.
 
 | Owner result | Observation |
 | --- | --- |

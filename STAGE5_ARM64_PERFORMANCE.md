@@ -11,14 +11,19 @@ in STAGE4_FINAL_VALIDATION.md with their original uncontrolled-workload limitati
 
 ## Owner application session at b62e5550
 
-Owner-supplied summary from matching image/tools at
+Owner results from matching image/tools at
 `b62e5550781aa52b2f70bb8602283c9e026eb975`: approximately five minutes on Surface Pro 11,
 267 application process-tree samples, exit 0, zero JVM crash reports and playback
 errors, player initialization and native destruction returned. Embedded AV1 1080p
 near 23.976 FPS reported auto requested / d3d11va active across 40 qualifying
 intervals from 57 playback samples. This is initial stability/hardware evidence,
-not an endurance result. Raw JSON/ZIP were not attached to this finalization request;
-the supplied summary is recorded without claiming independent raw-file analysis.
+not an endurance result. The supplied aggregate JSON and application-session manifest
+were independently inspected: duration 311.70 seconds, matching source/architecture,
+exit/crash/error values and metrics. [Sanitized evidence/input hashes](docs/stage5/owner-surface-results.json)
+are committed; raw archives, private paths and media/account identifiers are excluded.
+The legacy archive checklist is still pending; the owner's explicit narrower
+milestone acceptance is separate. Raw per-sample telemetry was not reprocessed and
+hardware testing was not repeated during finalization.
 
 CPU mean approximately **2.40%**, peak **23.41%**, last **1.35%**, normalized across
 logical processors. This covers startup/navigation and the application session,

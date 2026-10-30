@@ -1,0 +1,132 @@
+{
+  "schema": "nuvio-stage5-owner-summary-v1",
+  "testedSourceCommit": "b62e5550781aa52b2f70bb8602283c9e026eb975",
+  "architecture": "arm64",
+  "evidence": "Owner full-application Surface Pro 11 session; independently inspected exported aggregate JSON and generated session manifest. Raw per-sample playback logs were not supplied or recalculated.",
+  "safeResultsSha256": "196ab094d678c298aa7731b8cf8320a83da75d717e01d01f376e837ba7bfa22d",
+  "ownerArchiveSha256": "d0c5d41dc58bb690ae3975a9a58c272faacd806bb8dbee7d416dbb0e310d80b5",
+  "durationSeconds": 311.7046746,
+  "exitCode": 0,
+  "crashReports": 0,
+  "relevantEventSummaryCount": 0,
+  "legacyChecklistAllPending": true,
+  "ownerAcceptance": "Explicit owner approval of the narrower initial Stage 5 milestone; legacy archive checklist statuses are not rewritten as passes.",
+  "processScopes": [
+    "process-tree"
+  ],
+  "metrics": {
+    "cpuPercent": {
+      "count": 267,
+      "mean": 2.400678894610186,
+      "peak": 23.414482701621505,
+      "first": 11.101510047081756,
+      "last": 1.3461898991904078
+    },
+    "workingSetBytes": {
+      "count": 267,
+      "mean": 1229719636.3745317,
+      "peak": 2310934528,
+      "first": 201744384,
+      "last": 743501824
+    },
+    "privateBytes": {
+      "count": 267,
+      "mean": 1260440203.9850187,
+      "peak": 2157854720,
+      "first": 316067840,
+      "last": 782495744
+    },
+    "handles": {
+      "count": 267,
+      "mean": 1965.5280898876404,
+      "peak": 4317,
+      "first": 735,
+      "last": 1243
+    },
+    "threads": {
+      "count": 267,
+      "mean": 118.08239700374531,
+      "peak": 239,
+      "first": 47,
+      "last": 70
+    },
+    "processCount": {
+      "count": 267,
+      "mean": 3.4157303370786516,
+      "peak": 8,
+      "first": 2,
+      "last": 2
+    }
+  },
+  "sessions": [
+    {
+      "id": 1,
+      "initialized": true,
+      "destroyReturned": true,
+      "errors": 0,
+      "samples": 57,
+      "progressingHardwareIntervals": 40,
+      "softwareSamples": 0,
+      "requestedModes": [
+        "auto"
+      ],
+      "modes": [
+        "d3d11va"
+      ],
+      "codecs": [
+        "av1"
+      ],
+      "video": {
+        "video-params/w": {
+          "first": 1920,
+          "last": 1920,
+          "min": 1920,
+          "max": 1920
+        },
+        "video-params/h": {
+          "first": 1080,
+          "last": 1080,
+          "min": 1080,
+          "max": 1080
+        },
+        "container-fps": {
+          "first": 23.9760246277,
+          "last": 23.9760246277,
+          "min": 23.9760246277,
+          "max": 23.9760246277
+        },
+        "estimated-vf-fps": {
+          "first": 23.9760241676,
+          "last": 23.9760241676,
+          "min": 23.9760241676,
+          "max": 23.9760241676
+        },
+        "frame-drop-count": {
+          "first": 0,
+          "last": 0,
+          "min": 0,
+          "max": 5
+        },
+        "decoder-frame-drop-count": {
+          "first": 0,
+          "last": 0,
+          "min": 0,
+          "max": 0
+        },
+        "avsync": {
+          "first": 0,
+          "last": 1.29000001336E-05,
+          "min": -0.0419954999999,
+          "max": 0.00160530279384
+        },
+        "demuxer-cache-duration": {
+          "first": 0,
+          "last": 569.024,
+          "min": 0,
+          "max": 569.024
+        }
+      }
+    }
+  ],
+  "limitations": "Runtime-reported decoder evidence, not a per-frame GPU trace. Maximum sampled video-drop counter is not a cumulative drop total. Whole-session process metrics include startup/navigation; summed working sets can double-count shared pages, private bytes include managed/native allocations. No proven optimization, energy benefit, endurance or leak freedom."
+}
