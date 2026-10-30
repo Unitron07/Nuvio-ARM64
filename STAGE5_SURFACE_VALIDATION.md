@@ -27,6 +27,8 @@ The Stage 3 isolation/audit/manifest infrastructure is reused. No personal profi
 is copied. Console output is discarded unless explicitly requested through the
 older fixture-only launcher. The Stage 5 launcher enables native diagnostic files
 and process metrics; raw data stays in private/. Profile/ and private/ stay local.
+Inspect processScopes and processCount: the sampler follows the packaged launcher's
+JVM/WebView2 descendants; launcher-only fallback is an incomplete measurement.
 The Stage 3 ZIP is separate historical acceptance output. For Stage 5 share only
 `stage5-safe-results.json` after inspecting it, plus a manually redacted checklist.
 Regenerate after additional sessions with:

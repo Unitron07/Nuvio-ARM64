@@ -94,22 +94,22 @@ try {
     foreach ($name in $saved.Keys) { [Environment]::SetEnvironmentVariable($name, $saved[$name], 'Process') }
 }
 if ($PerformanceMetrics) {
+    . "$PSScriptRoot/ProcessMetrics.ps1"
     $metricsPath = Join-Path $private "$session.metrics.jsonl"
-    $previousCpu = 0.0
+    $previousCpu = @{}
     $previousTime = $started
     while (-not $process.WaitForExit(1000)) {
         try {
-            $process.Refresh()
+            $tree=Get-NuvioProcessTreeMetrics -RootProcessId $process.Id -PreviousCpu $previousCpu
             $now = [DateTime]::UtcNow
-            $cpu = $process.TotalProcessorTime.TotalSeconds
             $interval = ($now - $previousTime).TotalSeconds
             [ordered]@{elapsedSeconds=($now-$started).TotalSeconds;
-                cpuPercent=100*($cpu-$previousCpu)/$interval/[Environment]::ProcessorCount;
-                workingSetBytes=$process.WorkingSet64; privateBytes=$process.PrivateMemorySize64;
-                handles=$process.HandleCount; threads=$process.Threads.Count} |
+                cpuPercent=100*$tree.cpuSeconds/$interval/[Environment]::ProcessorCount;
+                workingSetBytes=$tree.workingSetBytes; privateBytes=$tree.privateBytes;
+                handles=$tree.handles; threads=$tree.threads; processCount=$tree.processCount; scope=$tree.scope} |
                 ConvertTo-Json -Compress | Add-Content -LiteralPath $metricsPath
-            $previousCpu=$cpu; $previousTime=$now
-        } catch [InvalidOperationException] { if (-not $process.HasExited) { throw } }
+            $previousTime=$now
+        } catch { } # Optional measurement failure must not interrupt the owner session.
     }
 } else { $process.WaitForExit() }
 try {

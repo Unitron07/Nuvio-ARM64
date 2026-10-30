@@ -9,7 +9,7 @@ in STAGE4_FINAL_VALIDATION.md with their original uncontrolled-workload limitati
 
 - Opt-in actual-player decoder/timing/drop diagnostics, sanitized at the native
   boundary; unavailable numeric properties are null.
-- Isolated owner launcher samples launcher/JVM CPU, working set, private bytes,
+- Isolated owner launcher samples application process-tree CPU, working set, private bytes,
   handles and threads once per second; raw samples remain under private/.
 - Collector emits per-launch source/architecture, crash count, native-player
   initialization/destruction markers, progressing hardware intervals and process
@@ -38,8 +38,12 @@ whole launch; use separate launches for each workload and exclude warm-up manual
 from private raw samples for controlled comparisons. It does not yet compute latency,
 GC, native allocation attribution or statistically comparable baseline deltas.
 
-CPU percent is normalized to all logical processors and covers the launcher/JVM,
-excluding WebView2 children/system work. Memory includes Java and native allocations;
+CPU percent is normalized to all logical processors and covers the discovered
+launcher/JVM/WebView2 descendants. The packaged launcher has a lightweight parent;
+sampling that PID alone undercounts the JVM. Tree discovery uses parent PIDs only,
+never command lines. Check exported processScopes: unavailable discovery is explicitly
+launcher-only. Exited/inaccessible workers and processes between samples can be missed.
+Summed working sets double-count shared pages. Memory includes Java and native allocations;
 private-byte growth is not a measured native leak. For GC, use JDK JFR/jcmd locally
 with an isolated fixture profile. Compare allocation rate/pauses and CPU stacks
 before changing startup, catalog/image work or background tasks. JFR/raw dumps may
@@ -72,6 +76,11 @@ Diagnostics introduce IO/property-read overhead. Run the same instrumentation in
 both compared configurations; repeat a representative case with diagnostics disabled
 to estimate observer impact. No aggressive scheduling, cache resizing, image-quality,
 gesture or visual changes are included without profiling evidence.
+
+The process-tree tests cover out-of-order/nested children, unrelated/cyclic records,
+real current-process sampling and retired CPU-baseline cleanup. A baseline packaged
+native-prerequisite smoke validates sampler integration in an isolated profile; it
+is not final-head player acceptance. Process discovery adds observer overhead.
 
 ## Stability and evidence ledger
 

@@ -61,8 +61,9 @@ export function summarize(records, metrics = []) {
   };
   return {schema: 'nuvio-stage5-summary-v1', sessions: [...sessions.values()].map(({previous, modes, codecs, requestedModes, ...s}) =>
     ({...s, modes: [...modes], codecs: [...codecs], requestedModes: [...requestedModes]})), metrics: Object.fromEntries(
-      ['cpuPercent', 'workingSetBytes', 'privateBytes', 'handles', 'threads'].map(k => [k, stats(k)])),
-    limitations: 'Runtime-reported decoder plus progressing playback; not a per-frame GPU trace. Destroy-returned is libmpv return only. CPU is launcher/JVM normalized to logical processors, excludes WebView2 children. Private bytes include managed and native allocations; growth is not a leak diagnosis. GPU, GC and energy require separate measurement.'};
+      ['cpuPercent', 'workingSetBytes', 'privateBytes', 'handles', 'threads', 'processCount'].map(k => [k, stats(k)])),
+    processScopes: [...new Set(metrics.map(m => category(m.scope, new Set(['process-tree', 'launcher-only']))))],
+    limitations: 'Runtime-reported decoder plus progressing playback; not a per-frame GPU trace. Destroy-returned is libmpv return only. CPU is best-effort process-tree utilization normalized to logical processors; check processScopes for launcher-only fallback. Exited/inaccessible workers may be missed; summed working sets double-count shared pages. Private bytes include managed and native allocations; growth is not a leak diagnosis. GPU, GC and energy require separate measurement.'};
 }
 function jsonLines(file) {
   if (fs.statSync(file).size > 32 * 1024 * 1024) throw new Error('Oversized diagnostic file');

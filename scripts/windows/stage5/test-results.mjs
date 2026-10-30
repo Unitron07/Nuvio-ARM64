@@ -30,5 +30,9 @@ try {
   const output=fs.readFileSync(collect(tmp),'utf8');
   assert(!output.includes('secret')); assert(!output.includes('https:'));
   assert.equal(JSON.parse(output).runs[0].sessions[0].progressingHardwareIntervals,1);
-} finally { fs.rmSync(tmp,{recursive:true,force:true}); }
+} finally {
+  assert.equal(path.dirname(path.resolve(tmp)), path.resolve(os.tmpdir()));
+  assert(path.basename(tmp).startsWith('nuvio-stage5-'));
+  fs.rmSync(tmp,{recursive:true,force:true});
+}
 console.log('PASS: sustained decoder evidence, missing values, seek/paused rejection and allowlisted collection');

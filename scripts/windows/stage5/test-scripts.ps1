@@ -6,4 +6,5 @@ foreach ($script in @(Get-ChildItem -LiteralPath $PSScriptRoot -Filter '*.ps1') 
 }
 & node "$PSScriptRoot/test-results.mjs"
 if ($LASTEXITCODE -ne 0) { throw 'Stage 5 privacy/evidence tests failed.' }
+& "$PSScriptRoot/test-process-metrics.ps1"
 Write-Host 'PASS: Stage 5 PowerShell syntax and privacy/evidence tests'
