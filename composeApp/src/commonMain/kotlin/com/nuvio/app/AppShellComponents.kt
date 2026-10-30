@@ -41,6 +41,11 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.foundation.layout.Row
+import androidx.compose.material3.IconButton
+import androidx.compose.material.icons.automirrored.rounded.KeyboardArrowLeft
+import androidx.compose.material.icons.automirrored.rounded.KeyboardArrowRight
+import nuvio.composeapp.generated.resources.action_expand
+import nuvio.composeapp.generated.resources.action_collapse
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.State
 import androidx.compose.runtime.getValue
@@ -725,7 +730,9 @@ internal fun DesktopHoverSidebar(
     onAddProfileRequested: () -> Unit,
     sidebarExpanded: Boolean = false,
     sidebarWidth: Dp = DesktopSidebarCollapsedWidth,
-    hoverSource: MutableInteractionSource = remember { MutableInteractionSource() },
+    hoverModifier: Modifier = Modifier,
+    showExpansionToggle: Boolean = true,
+    onExpansionToggle: () -> Unit = {},
     profileStackVisible: Boolean = false,
     onProfileStackVisibleChange: (Boolean) -> Unit = {},
     modifier: Modifier = Modifier,
@@ -747,7 +754,7 @@ internal fun DesktopHoverSidebar(
         modifier = modifier
             .width(sidebarWidth)
             .fillMaxHeight()
-            .hoverable(hoverSource)
+            .then(hoverModifier)
             .zIndex(NuvioTokens.Z.navigation),
         color = tokens.colors.background,
         contentColor = tokens.colors.textPrimary,
@@ -812,6 +819,15 @@ internal fun DesktopHoverSidebar(
                         .width(DesktopSidebarExpandedContentWidth)
                         .zIndex(NuvioTokens.Z.sheet),
                 )
+            }
+
+            if (showExpansionToggle) {
+                IconButton(onClick = onExpansionToggle, modifier = Modifier.align(Alignment.BottomCenter).padding(bottom = 12.dp)) {
+                    Icon(
+                        imageVector = if (sidebarExpanded) Icons.AutoMirrored.Rounded.KeyboardArrowLeft else Icons.AutoMirrored.Rounded.KeyboardArrowRight,
+                        contentDescription = stringResource(if (sidebarExpanded) Res.string.action_collapse else Res.string.action_expand),
+                    )
+                }
             }
 
             Column(

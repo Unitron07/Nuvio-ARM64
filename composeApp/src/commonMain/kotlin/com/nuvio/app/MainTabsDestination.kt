@@ -3,8 +3,9 @@ package com.nuvio.app
 import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.animation.core.tween
-import androidx.compose.foundation.interaction.MutableInteractionSource
-import androidx.compose.foundation.interaction.collectIsHoveredAsState
+import com.nuvio.app.core.ui.sidebarShouldExpand
+import com.nuvio.app.core.ui.SidebarHoverIntent
+import com.nuvio.app.core.ui.deliberateSidebarHover
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.PaddingValues
@@ -117,15 +118,15 @@ internal fun MainTabsDestination(
         val navBarStyleSetting by remember { ThemeSettingsRepository.navBarStyle }.collectAsStateWithLifecycle()
         val homeCatalogSettingsUiState by remember { HomeCatalogSettingsRepository.uiState }.collectAsStateWithLifecycle()
 
-        val sidebarHoverSource = remember { MutableInteractionSource() }
-        val isSidebarHovered by sidebarHoverSource.collectIsHoveredAsState()
+        val sidebarIntent = remember { SidebarHoverIntent() }
+        val isSidebarHovered = sidebarIntent.expanded
+        var sidebarExplicitlyExpanded by remember { mutableStateOf(false) }
         var isProfileStackVisible by remember { mutableStateOf(false) }
 
-        val isSidebarExpanded = when (navBarStyleSetting) {
-            NavBarStyle.EXPANDED -> true
-            NavBarStyle.COMPACT -> isProfileStackVisible
-            else -> isSidebarHovered || isProfileStackVisible // ADAPTIVE
+        LaunchedEffect(rootRouteActive) {
+            if (!rootRouteActive) { sidebarExplicitlyExpanded = false; isProfileStackVisible = false }
         }
+        val isSidebarExpanded = sidebarShouldExpand(navBarStyleSetting, rootRouteActive, isSidebarHovered, sidebarExplicitlyExpanded, isProfileStackVisible)
 
         val animatedSidebarWidth by animateDpAsState(
             targetValue = if (isSidebarExpanded) DesktopSidebarExpandedWidth else DesktopSidebarCollapsedWidth,
@@ -263,7 +264,9 @@ internal fun MainTabsDestination(
                         onAddProfileRequested = onAddProfileRequested,
                         sidebarExpanded = isSidebarExpanded,
                         sidebarWidth = animatedSidebarWidth,
-                        hoverSource = sidebarHoverSource,
+                        hoverModifier = Modifier.deliberateSidebarHover(rootRouteActive, sidebarIntent),
+                        showExpansionToggle = navBarStyleSetting != NavBarStyle.EXPANDED,
+                        onExpansionToggle = { sidebarExplicitlyExpanded = !isSidebarExpanded; sidebarIntent.expanded = false },
                         profileStackVisible = isProfileStackVisible,
                         onProfileStackVisibleChange = { isProfileStackVisible = it },
                         modifier = Modifier.align(Alignment.CenterStart),

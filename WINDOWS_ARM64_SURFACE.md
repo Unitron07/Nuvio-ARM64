@@ -1,15 +1,18 @@
 # Windows ARM64 and Surface Pro 11
 
-Status: **Stage 3 core functionality validated / ready for merge.** The owner
-confirmed native launch, navigation, settings, clean exit, local addon/HTTP
-playback, account sign-in/synchronization and real debrid playback on Surface
-Pro 11. Authentication uses recovered upstream-compatible public configuration
-supplied by the ARM64 build workflow. Later account results are owner-confirmed
-on a post-authentication-fix build; its exact tested SHA is unavailable.
-[Stage 4 touch and hardening work](STAGE4_ROADMAP.md) remains deferred. See the current
-[Stage 3 plan, evidence ledger and Surface owner procedure](STAGE3_ARM64_VALIDATION.md).
-Historical investigation sections below retain their original results and dates;
-the current Stage 3 ledger supersedes historical pending acceptance statements.
+Status: **Core touchscreen UX validated on Surface Pro 11 — ready for merge, subject to final checks.**
+See [Stage 4 final validation](STAGE4_FINAL_VALIDATION.md) for the owner's tested
+scrolling, menu/navigation and integration paths, cache A/B observations, automated
+evidence and nonblocking limits. PR #9 remains unmerged; the owner will merge manually.
+
+Stage 3 PR #4 is merged. Native launch/exit, account/addon sync, existing resume data
+and real debrid video/audio remain owner-confirmed. Authentication uses the existing
+upstream-compatible configuration supplied by the ARM64 workflow; no credential
+storage change is part of Stage 4. Exact owner hardware-tested SHA was not supplied.
+See the [Stage 3 ledger](STAGE3_ARM64_VALIDATION.md) and [remaining roadmap](STAGE4_ROADMAP.md).
+Historical sections below retain original results/dates and pending statements;
+the final Stage 4 ledger supersedes those historical core-touch acceptance statements.
+
 Baseline: [NuvioMedia/NuvioDesktop Dev](https://github.com/NuvioMedia/NuvioDesktop/tree/5e18596aa919a6a4e7b6cdee7f90dfaabbf71b00), commit `5e18596aa919a6a4e7b6cdee7f90dfaabbf71b00`.
 Inspection: October 24–26, 2026.
 

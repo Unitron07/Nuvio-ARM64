@@ -362,6 +362,7 @@ let isScrubbing = false;
 let scrubPositionMs = 0;
 let tapTimer = 0;
 let activeModal = "";
+let modalOpener = null;
 let pressedButton = null;
 let focusedActionCommand = "";
 let sourceFilterId = "";
@@ -1024,12 +1025,17 @@ const setModalVisibility = (modal, visible, animated = true) => {
 
 const closePlayerModal = (notifyDismiss = false, animated = true) => {
   const closingModal = activeModal;
+  const restoreFocus = modalOpener;
+  modalOpener = null;
   activeModal = "";
   modalElements.forEach(modal => {
     setModalVisibility(modal, false, animated);
   });
   if (notifyDismiss && closingModal === "p2pConsent") {
     send("cancelP2pForPlayerControls", 0);
+  }
+  if (restoreFocus?.isConnected && typeof restoreFocus.focus === "function") {
+    restoreFocus.focus({ preventScroll: true });
   }
   if (closingModal === "episodes") onEpisodesModalClosed();
   if (closingModal === "party") onPartyModalClosed();
@@ -1044,6 +1050,7 @@ const openPlayerModal = modal => {
   }
   if (activeModal === "party" && modal !== "party") onPartyModalClosed();
   if (modal === "party" && activeModal !== "party") onPartyModalOpened();
+  if (!activeModal) modalOpener = document.activeElement;
   activeModal = modal;
   if (modal === "submitIntro") {
     const contentKey = state.submitIntroContentKey || "";
@@ -2931,6 +2938,15 @@ openingOverlay.addEventListener("click", event => {
 });
 
 modalElements.forEach(modal => {
+  // Keep menu gestures away from root playback/hold/drag handlers.
+  modal.addEventListener("pointerdown", event => event.stopPropagation());
+  modal.querySelectorAll("[data-dismiss-player-menu]").forEach(button => {
+    button.addEventListener("click", event => {
+      event.preventDefault();
+      event.stopPropagation();
+      closePlayerModal(true);
+    });
+  });
   modal.addEventListener("click", event => {
     event.stopPropagation();
     if (modal.classList.contains("player-rail-modal")) {

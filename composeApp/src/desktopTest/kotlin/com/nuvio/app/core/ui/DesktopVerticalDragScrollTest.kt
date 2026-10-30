@@ -70,6 +70,25 @@ class DesktopVerticalDragScrollTest {
         compose.runOnIdle { assertEquals(1, clicks) }
     }
 
+    @Test fun releaseContinuesScrollingWithFrameworkFling() {
+        setContent()
+        compose.mainClock.autoAdvance = false
+        compose.onNodeWithTag("page").performMouseInput {
+            moveTo(Offset(150f, 250f)); press()
+            moveTo(Offset(150f, 210f), delayMillis = 20)
+            moveTo(Offset(150f, 150f), delayMillis = 20)
+            moveTo(Offset(150f, 80f), delayMillis = 20); release()
+        }
+        var before = 0
+        compose.runOnIdle { before = vertical.firstVisibleItemIndex * 1000 + vertical.firstVisibleItemScrollOffset }
+        compose.mainClock.advanceTimeBy(160)
+        compose.runOnIdle {
+            assertTrue(vertical.firstVisibleItemIndex * 1000 + vertical.firstVisibleItemScrollOffset > before)
+            assertEquals(0, clicks)
+        }
+        compose.mainClock.autoAdvance = true
+    }
+
     @Test fun horizontalShelfDragDoesNotMovePage() {
         setContent()
         compose.onNodeWithTag("shelf").performMouseInput {
@@ -83,6 +102,29 @@ class DesktopVerticalDragScrollTest {
             assertTrue(horizontal.firstVisibleItemIndex > 0 || horizontal.firstVisibleItemScrollOffset > 0)
             assertEquals(0, clicks)
         }
+    }
+
+    @Test fun shortFlickContinuesAndNewPressStopsMomentum() {
+        setContent()
+        compose.mainClock.autoAdvance = false
+        compose.onNodeWithTag("page").performMouseInput {
+            moveTo(Offset(150f, 240f)); press()
+            moveTo(Offset(150f, 230f), delayMillis = 10)
+            moveTo(Offset(150f, 215f), delayMillis = 10)
+            moveTo(Offset(150f, 195f), delayMillis = 10); release()
+        }
+        var before = 0
+        fun position() = vertical.firstVisibleItemIndex * 1000 + vertical.firstVisibleItemScrollOffset
+        compose.runOnIdle { before = position() }
+        compose.mainClock.advanceTimeBy(96)
+        compose.runOnIdle { assertTrue(position() > before); assertEquals(0, clicks) }
+        compose.onNodeWithTag("page").performMouseInput { moveTo(Offset(150f, 240f)); press() }
+        compose.mainClock.advanceTimeBy(32)
+        compose.runOnIdle { before = position() }
+        compose.mainClock.advanceTimeBy(160)
+        compose.runOnIdle { assertEquals(before, position()) }
+        compose.onNodeWithTag("page").performMouseInput { release() }
+        compose.mainClock.autoAdvance = true
     }
 
     @Test fun secondaryButtonDragDoesNotScrollPage() {

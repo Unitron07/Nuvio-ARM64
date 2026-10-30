@@ -3476,3 +3476,8 @@ svg {
   stroke: none;
   pointer-events: none;
 }
+
+/* Touch-accessible dismissal shared by playback track/options rails. */
+.menu-title-row { display: flex; align-items: center; justify-content: space-between; gap: 16px; }
+.menu-dismiss { min-width: 44px; min-height: 44px; border: 1px solid currentColor; border-radius: 50%; color: inherit; background: transparent; font-size: 28px; cursor: pointer; touch-action: manipulation; }
+.menu-dismiss:focus-visible { outline: 3px solid currentColor; outline-offset: 3px; }
