@@ -918,6 +918,7 @@ val buildWindowsPlayerBridge = tasks.register<Exec>("buildWindowsPlayerBridge") 
     inputs.property("architecture", windowsPlayerBridgeArch)
     inputs.file(rootProject.file("scripts/windows/verify-pe-architecture.ps1"))
     inputs.file(windowsPlayerBridgeSource)
+    inputs.file(layout.projectDirectory.file("src/desktopMain/native/windows/playback_diagnostics.h"))
     if (windowsWebView2IncludeDir.exists()) {
         inputs.dir(windowsWebView2IncludeDir)
     }

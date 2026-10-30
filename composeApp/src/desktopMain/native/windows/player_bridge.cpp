@@ -9,6 +9,7 @@
 #include <wrl.h>
 #include <WebView2.h>
 #include <jni.h>
+#include "playback_diagnostics.h"
 
 #include <algorithm>
 #include <atomic>
@@ -23,6 +24,8 @@
 #include <deque>
 #include <functional>
 #include <filesystem>
+#include <fstream>
+#include <limits>
 #include <memory>
 #include <mutex>
 #include <sstream>
@@ -1139,6 +1142,7 @@ public:
         if (GetCurrentThreadId() != uiThreadId) {
             joinOrDetach(uiThread);
         }
+        writePlaybackDiagnostic("destroy-returned");
 
         if (eventSink) {
             bool didAttach = false;
@@ -1561,7 +1565,11 @@ private:
     std::thread eventThread;
     std::atomic_bool stopping = false;
     std::atomic_bool shuttingDown = false;
-    std::atomic_bool hwdecLogged = false;  // one-shot log for hwdec-current
+    // Empty unless explicitly enabled. No timer, property reads or file IO by default.
+    std::filesystem::path playbackDiagnosticPath;
+    std::chrono::steady_clock::time_point diagnosticStart;
+    std::chrono::steady_clock::time_point diagnosticLast;
+    uint64_t diagnosticSession = 0;
 
     bool hasAppliedSubtitleStyle = false;
     bool appliedSubtitleUseLibass = false;
@@ -1883,6 +1891,14 @@ private:
         bool nvidiaRtxSuperResolutionEnabled
     ) {
         MpvApi &api = mpvApi();
+        wchar_t diagnosticPath[32768] = {};
+        DWORD pathLength = GetEnvironmentVariableW(L"NUVIO_PLAYBACK_DIAGNOSTICS", diagnosticPath, 32768);
+        if (pathLength > 0 && pathLength < 32768 && std::filesystem::path(diagnosticPath).is_absolute()) {
+            playbackDiagnosticPath = diagnosticPath;
+            diagnosticStart = diagnosticLast = std::chrono::steady_clock::now();
+            static std::atomic_uint64_t nextSession{0};
+            diagnosticSession = ++nextSession;
+        }
         bool fastProfile = !nvidiaRtxSuperResolutionEnabled && unifiedMemoryGpu();
         {
             std::lock_guard<std::mutex> lock(mpvMutex);
@@ -1993,6 +2009,7 @@ private:
         }
 
         setPaused(!playWhenReady);
+        writePlaybackDiagnostic("initialized");
         auto self = shared_from_this();
         eventThread = std::thread([self]() { self->drainMpvEvents(); });
     }
@@ -2196,6 +2213,11 @@ private:
 
             mpv_event *event = mpvApi().waitEvent(current, 0.5);
             if (!event) continue;
+            if (!playbackDiagnosticPath.empty() &&
+                    std::chrono::steady_clock::now() - diagnosticLast >= std::chrono::seconds(1)) {
+                writePlaybackDiagnostic("sample");
+                diagnosticLast = std::chrono::steady_clock::now();
+            }
             if (event->event_id == MPV_EVENT_SHUTDOWN) {
                 return;
             }
@@ -2205,10 +2227,64 @@ private:
                 int status[2] = {};
                 std::memcpy(status, event->data, sizeof(status));
                 if (status[0] == 4 && status[1] < 0 && !stopping.load()) {
+                    writePlaybackDiagnostic("playback-error", status[1]);
                     sendPlayerEvent("playbackError", static_cast<double>(status[1]));
                 }
             }
         }
+    }
+
+    void writePlaybackDiagnostic(const char *phase, int error = 0) noexcept {
+        if (playbackDiagnosticPath.empty()) return;
+        // Diagnostic failure must never interrupt playback or destruction.
+        try {
+            std::string fields;
+            {
+                std::lock_guard<std::mutex> lock(mpvMutex);
+                if (mpv) {
+                    auto text = [&](const char *name) {
+                        char *value = nullptr;
+                        int result = mpvApi().getProperty(mpv, name, MPV_FORMAT_STRING, &value);
+                        std::string copy = result >= 0 && value ? value : "";
+                        if (value) mpvApi().freeValue(value);
+                        return copy;
+                    };
+                    auto numeric = [&](const char *name) {
+                        std::string property(name);
+                        if (property == "pause" || property == "core-idle" ||
+                                (property.size() >= 9 && property.compare(property.size() - 9, 9, "/selected") == 0)) {
+                            int flag = 0;
+                            if (mpvApi().getProperty(mpv, name, MPV_FORMAT_FLAG, &flag) >= 0) return double(flag);
+                            return std::numeric_limits<double>::quiet_NaN();
+                        }
+                        double value = std::numeric_limits<double>::quiet_NaN();
+                        if (mpvApi().getProperty(mpv, name, MPV_FORMAT_DOUBLE, &value) < 0)
+                            return std::numeric_limits<double>::quiet_NaN();
+                        return value;
+                    };
+                    fields = nuvio_diagnostics::snapshot(text, numeric);
+                }
+            }
+            // Synchronize multiple players and bound retention to 16 MiB per launch.
+            static std::mutex fileMutex;
+            std::lock_guard<std::mutex> lock(fileMutex);
+            std::error_code ec;
+            auto size = std::filesystem::file_size(playbackDiagnosticPath, ec);
+            if (!ec && size >= 16 * 1024 * 1024) return;
+            std::ofstream output(playbackDiagnosticPath, std::ios::app);
+            output.imbue(std::locale::classic());
+            output << "{\"schema\":\"nuvio-playback-v1\",\"session\":" << diagnosticSession
+#if defined(_M_ARM64)
+                << ",\"architecture\":\"arm64\""
+#else
+                << ",\"architecture\":\"x64\""
+#endif
+                << ",\"phase\":\"" << phase << "\",\"elapsedSeconds\":"
+                << nuvio_diagnostics::number(std::chrono::duration<double>(std::chrono::steady_clock::now() - diagnosticStart).count())
+                << ",\"errorCode\":" << error;
+            if (!fields.empty()) output << ',' << fields;
+            output << "}\n";
+        } catch (...) { }
     }
 
     JNIEnv *jniEnvDidAttach(bool *didAttach) {
