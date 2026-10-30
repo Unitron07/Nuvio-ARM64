@@ -102,7 +102,8 @@ A local Gradle attempt could not create its lock under the restricted user cache
 no new local Kotlin/Compose test pass is claimed. Final-head CI provides the clean
 matching-architecture build/integration evidence.
 
-Finalization updates documentation and development-check path filters so these
+Finalization also removes obsolete shelf pointer-handler imports, without changing
+behavior, and updates documentation and development-check path filters so these
 checks rerun for the final documentation commit. **The final SHA, actual rerun
 results and workflow links are recorded in PR #9** after completion; readiness is
 conditional until those final-head checks pass. Unit coverage includes gesture,
@@ -125,7 +126,8 @@ Issues [#5](https://github.com/Unitron07/Nuvio-ARM64/issues/5),
 [#6](https://github.com/Unitron07/Nuvio-ARM64/issues/6),
 [#7](https://github.com/Unitron07/Nuvio-ARM64/issues/7) and
 [#8](https://github.com/Unitron07/Nuvio-ARM64/issues/8) have owner-reported core
-resolution and will receive verification notes/closure after final checks. Repository
+resolution. They were previously closed by the unlabeled-issue bot as `not_planned`;
+verification notes and corrected `completed` resolution follow final checks. Repository
 issue search found no separate expanded-shelf, dropdown, source-selector, sidebar
 or catalog-performance issues; those resolutions are recorded here and in PR #9.
 
