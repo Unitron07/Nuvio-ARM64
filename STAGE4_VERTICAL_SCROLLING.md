@@ -1,9 +1,13 @@
 # Vertical shelf scrolling: measured work and bounded scale reuse
 
-Status: targeted optimization implemented; Surface speedup remains pending. PR #9
-stays draft. Media/authentication/provider and gesture physics code are unchanged.
-This supersedes the earlier missing-recording/diagnostic-only status in the older
-performance guide; that history remains for provenance.
+**Core touchscreen UX validated on Surface Pro 11 — ready for merge, subject to final checks.**
+
+[Final validation ledger](STAGE4_FINAL_VALIDATION.md) records the owner-reported A/B:
+6.66% to 4.35% severe vertical callback intervals (approximately 34.7% relative
+reduction), 996 shared reuse hits and subjectively smoother scrolling. Sessions
+differ in duration/activity; this is not an FPS gain or proof all stutter is gone.
+The exact hardware-tested SHA/raw final recordings were not supplied with that report.
+The earlier v2 evidence and repeatable v3 procedure below retain their provenance.
 
 ## Verified owner recordings
 
@@ -115,7 +119,7 @@ GC/latency and animated-collection coverage limitations in STAGE4_PERFORMANCE.md
 still apply. The analyzer reports overlapping windows and refuses to silently
 combine multiple v3 probe IDs; older v2 cannot support direction/ID selection.
 
-## Exact Surface A/B procedure (new physical results pending)
+## Repeatable Surface A/B procedure
 
 Download passing image and owner tools for the same final commit linked in PR #9.
 Use a fresh isolated RunDirectory per image; use the SAME local test profile/content
@@ -160,5 +164,5 @@ bytes and shelf entries/disposals for matched phases. cacheBudgetBytes confirms
 off/on. Compare complete nonoverlapping windows; discard transitions/mixed phases.
 Verify horizontal smoothness/position retention, shelf refresh updates, taps and
 arbitration, details/settings/source list, menu dismissal, mouse/keyboard and real
-debrid playback. No new physical result is marked passed; existing owner successes
-remain recorded. No Surface speedup numbers have been invented.
+debrid playback. The final ledger records the later owner comparison with its
+limitations; this repeatable procedure is retained for stronger controlled evidence.

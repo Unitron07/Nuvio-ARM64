@@ -1,13 +1,18 @@
 # Stage 4: real-catalog performance investigation
 
-Current revision: [verified v2 evidence, bounded scale reuse and v3 A/B procedure](STAGE4_VERTICAL_SCROLLING.md).
-The diagnostic-only/missing-recording statements below describe the prior revision.
+**Core touchscreen UX validated on Surface Pro 11 — ready for merge, subject to final checks.**
 
-Status: diagnostic build, draft PR #9. No rendering optimization or performance
-improvement is claimed. Real-catalog stutter remains unresolved pending attribution.
-Touch slop, velocity/decay, native player, authentication and debrid code are unchanged.
+Current results: [final validation ledger](STAGE4_FINAL_VALIDATION.md) and
+[bounded scale reuse / v3 diagnostics](STAGE4_VERTICAL_SCROLLING.md). The owner
+reports measurable reuse, 6.66% to 4.35% severe vertical callback intervals and
+subjectively smoother scrolling. This is a limited A/B observation, not an FPS
+improvement or elimination of stutter.
 
-## Evidence ledger
+The diagnostic-only/no-optimization/missing-recording statements and v1/v2 procedure
+below are **historical**, preceding the shared cache and final owner report.
+They preserve the investigation evidence rather than describe current readiness.
+
+## Historical v1/v2 evidence ledger
 
 The owner confirms natural short swipes, source-selector dragging, Home/Settings,
 horizontal shelves and touch menu dismissal, plus authentication/sync, real addons,
@@ -158,4 +163,5 @@ these Windows workflows. No Android/iOS compatibility pass is invented.
 
 New controlled performance measurements, scale/GC attribution, subjective real
 scrolling responsiveness and repeated mixed-input/playback checks remain pending
-owner validation. Final-head test counts, CI and artifact links are in draft PR #9.
+as future controlled hardening. The later owner comparison is recorded in the
+final ledger; final-head test counts, CI and artifact links are in PR #9.

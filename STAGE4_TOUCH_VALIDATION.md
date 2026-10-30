@@ -1,21 +1,18 @@
 # Stage 4 technical plan and Surface validation
 
-Final cleanup: [expanded grids, Discover genre popup and sidebar intent](STAGE4_FINAL_TOUCH_CLEANUP.md).
-The latest owner reports improved real-catalog vertical scrolling and successful
-prior touch/playback fixes. Only the three cleanup items are newly pending;
-older per-revision pending checklists below are historical, not a rejection of
-the owner's later observations. Exact tested SHA was not supplied.
+**Core touchscreen UX validated on Surface Pro 11 — ready for merge, subject to final checks.**
 
-Latest: [vertical shelf re-entry optimization and direction-specific retest](STAGE4_VERTICAL_SCROLLING.md).
+[Final validation ledger](STAGE4_FINAL_VALIDATION.md) records the latest owner report,
+all core tested paths, the cache A/B observations and remaining coverage limits.
+[Final cleanup](STAGE4_FINAL_TOUCH_CLEANUP.md) explains expanded grids, Discover and
+sidebar changes. Exact owner hardware-tested SHA remains unavailable.
 
-Current performance work: [real-catalog investigation and v2 diagnostic procedure](STAGE4_PERFORMANCE.md).
-The v2 procedure supersedes the older v1 probe instructions below. Owner now
-confirms short flicks and source dragging; controlled real-catalog performance
-attribution remains pending. No rendering speedup is claimed.
+The per-revision reports, pending boxes and diagnostic procedures below are
+**historical investigation/checklists**, not current unresolved core blockers.
+The owner has since confirmed the reported core fixes, without claiming every
+individual menu, device or checklist subcase was tested. Final CI is linked in PR #9.
 
-Status: implementation in draft; physical touchscreen acceptance is pending.
-
-## Surface follow-up report and focused retest
+## Historical follow-up report and focused retest
 
 Owner reports successful sign-in, addon/catalog sync, real debrid/native video and
 audio, touch menu dismissal, most navigation, Settings dragging, smooth horizontal
@@ -149,7 +146,7 @@ titles per catalog, long descriptions and four seasons with twelve episodes each
 The default Stage 3 fixture is unchanged. All fixture streams use the supplied
 local media; no account or provider credentials are required.
 
-## Owner checklist — all pending physical validation
+## Historical owner checklist — use final ledger for current results
 
 - [ ] Home vertical/horizontal finger drag, release momentum and smooth stop.
 - [ ] Tap stops momentum; no oscillation at top/bottom; no unintended card clicks.
@@ -179,5 +176,6 @@ window message remapping is introduced. Settings modal lists use the shared list
 wrapper; independent verticalScroll/grid/dialog paths elsewhere remain an audit
 follow-up if hardware reveals gaps. Native WebView2 pointer capture, pen routing,
 focus after fullscreen, scaling, high refresh, performance and input switching
-remain hardware checks. No measured smoothness/CPU claim is made. Keep this PR
-draft until owner touchscreen validation and any discovered blockers are resolved.
+remain broader hardware checks. The final ledger records the later owner A/B
+observations; no CPU improvement or exhaustive hardware pass is claimed. Readiness
+now depends on final checks and absence of critical regressions.

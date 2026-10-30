@@ -1,16 +1,14 @@
 # Stage 4 final touchscreen cleanup
 
-Continue draft PR #9; no merge or release until owner acceptance.
+**Core touchscreen UX validated on Surface Pro 11 — ready for merge, subject to final checks.**
 
-## Owner observations
-
-The owner reports physical Surface Pro 11 success for short vertical swipes,
-improved real-catalog vertical scrolling with shared artwork reuse, smooth
-horizontal shelves, source/stream and Settings scrolling, subtitle/audio menu
-dismissal, and real debrid playback. The exact tested commit was not supplied;
-these observations are not acceptance of this follow-up build. Stage 4 is now in
-final cleanup. Only expanded shelves, Discover genre scrolling and accidental
-sidebar expansion remain in the latest reported scope.
+See [final validation and limitations](STAGE4_FINAL_VALIDATION.md). The latest owner
+report confirms expanded shelf and Discover genre scrolling, sidebar expansion/Back
+behavior and the earlier core touch/player/integration paths. Exact tested SHA was
+not supplied. This supersedes the previous pending core acceptance status.
+The checklist below remains available for repeat testing and unreported subcases;
+it does not imply each device, folder or keyboard path was individually tested.
+PR #9 is not merged; no release is authorized.
 
 ## Causes and targeted changes
 
@@ -49,7 +47,7 @@ outside dismissal, keyboard traversal, rail geometry and Back on the Surface.
 An attempted Escape test did not reach popup dismissal even with an explicitly
 focused option: Compose installs that callback on the scene layer, while the
 content input injector targets the owner. It is not counted as passing coverage;
-the final test verifies Enter activation, and native Escape remains pending.
+the final test verifies Enter activation, and native Escape has no new individually reported pass.
 
 ## Matching image and tools
 
@@ -74,7 +72,7 @@ If that directory already belongs to another image, choose a new name. Configure
 your authorized addon/account privately in this isolated profile. Do not enable
 fixture logging for real credentials. No new performance recording is required.
 
-## Exact Surface retest (all pending for this build)
+## Repeat Surface regression checklist (see final ledger for reported passes)
 
 - [ ] Expand a long Home shelf. Drag vertically from blank space and directly
       over posters, using short/long strokes in both directions. Release during
@@ -99,4 +97,4 @@ fixture logging for real credentials. No new performance recording is required.
 
 Record image commit, Windows/display scaling, input type, each result and concise
 reproduction details. Keep profiles, raw logs, account data and media URLs private.
-Do not mark these new fixes physically passed until the owner reports results.
+Only attribute physical passes to the paths actually reported in the final ledger.

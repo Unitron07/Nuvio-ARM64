@@ -77,10 +77,15 @@ The shared app is built with Kotlin Multiplatform and Compose Multiplatform.
 
 ## Windows ARM64 development
 
-Stage 3 core functionality is validated and ready for merge: native ARM64 launch,
+**Core touchscreen UX validated on Surface Pro 11 — ready for merge, subject to final checks.**
+See the [Stage 4 final validation ledger](STAGE4_FINAL_VALIDATION.md) for owner-reported
+touchscreen results, bounded artwork caching, A/B observations and remaining limits.
+PR #9 is prepared for owner review; it is not merged and no release is published.
+
+Stage 3 PR #4 is merged: native ARM64 launch,
 local addons, account sign-in/synchronization and real debrid playback are
 owner-confirmed on Surface Pro 11. Automated checks and owner reports are recorded
-separately; remaining hardening and touch work are in the
+separately; remaining hardening work is in the
 [Stage 4 roadmap](STAGE4_ROADMAP.md). See the
 [ARM64 build notes](WINDOWS_ARM64_SURFACE.md) and
 [Stage 3 tests, evidence and Surface owner procedure](STAGE3_ARM64_VALIDATION.md).

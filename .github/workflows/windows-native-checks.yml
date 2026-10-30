@@ -2,6 +2,7 @@ name: Windows native architecture checks
 on:
   pull_request:
     paths:
+      - STAGE4*.md
       - scripts/windows/**
       - composeApp/build.gradle.kts
       - .github/workflows/windows-native-checks.yml

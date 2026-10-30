@@ -2,6 +2,7 @@ name: Windows Stage 3 application integration
 on:
   pull_request:
     paths:
+      - STAGE4*.md
       - composeApp/src/commonMain/**
       - composeApp/src/commonTest/**
       - composeApp/src/desktopMain/**

@@ -1,28 +1,16 @@
 # Stage 4: touch usability and hardening
 
-Latest owner report: vertical catalog scrolling is improved, horizontal shelves
-are smooth, and source/Settings/menu/playback touch work succeeds. Exact tested
-SHA was not supplied. Stage 4 is in final cleanup for expanded grids, Discover
-genre scrolling and accidental sidebar expansion. See
-[final cleanup and Surface checklist](STAGE4_FINAL_TOUCH_CLEANUP.md).
-New physical acceptance remains pending; historical investigation notes follow.
+**Core touchscreen UX validated on Surface Pro 11 — ready for merge, subject to final checks.**
 
-Current performance revision: [bounded scaled-artwork reuse and v3 direction profiling](STAGE4_VERTICAL_SCROLLING.md).
-New Surface optimization results remain pending; horizontal/gesture behavior is preserved.
+The owner confirms Home/shelves, natural short swipes/momentum, tested details,
+Settings, expanded shelves, Discover genres, sources, player menus and repaired
+sidebar/Back behavior. Account/addon sync and native debrid playback remain working.
+See [final evidence, cache A/B results and limits](STAGE4_FINAL_VALIDATION.md).
+Stage 3 PR #4 is merged. PR #9 is prepared for review after final checks; no merge,
+release or installer publication is authorized. Core implementation is complete;
+future work below is hardening, not an open rejection of the reported fixes.
 
-Real-catalog rendering was the major owner-observed issue after the earlier
-touch follow-up. See [performance investigation](STAGE4_PERFORMANCE.md) for the
-evidence gap, non-speculative diagnostic build and controlled owner comparisons.
-
-Implementation is now in progress on `stage4-arm64-touchscreen-ux`. See
-[technical plan and owner validation](STAGE4_TOUCH_VALIDATION.md). The implementation
-is not physical touchscreen acceptance; all owner checklist rows remain pending.
-
-Stage 3 core functionality is validated and ready for merge in PR #4, subject to
-final-head CI. The work below is deferred and does not block core integration.
-No release or installer distribution is authorized by Stage 3 completion.
-
-## Owner-reported Surface touch issues
+## Original Surface touch issues — resolved in tested paths
 
 Observed on Microsoft Surface Pro 11 / Windows ARM64, October 28, 2026. Exact
 post-authentication-fix owner build SHA and issue frequencies are unavailable.
@@ -35,7 +23,9 @@ Do not assume these are ARM64-specific; compare upstream desktop and x64.
 | [#7 Settings scrolling](https://github.com/Unitron07/Nuvio-ARM64/issues/7) | Only narrow scrollbar dragging works; content swipes should scroll smoothly with momentum | Shared SettingsScreen and independent settings LazyColumns |
 | [#8 Subtitle dismissal](https://github.com/Unitron07/Nuvio-ARM64/issues/8) | Escape required; provide visible close/back or reliable tap outside | Upstream/shared desktop player-ui controls.js in WebView2 |
 
-Keep each fix scoped. Test detached-keyboard touch-only use, mouse/keyboard,
+The table preserves the original defects and code context. The final owner report
+confirms their core resolution; issue verification notes link PR #9. Further test
+coverage should include detached-keyboard touch-only use, mouse/keyboard,
 horizontal shelves, nested scrolling/child controls, cancellation and focus;
 collect before/after evidence. Shared code does not prove the upstream bug
 without hardware reproduction. Do not implement this overhaul in PR #4.
