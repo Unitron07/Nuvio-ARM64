@@ -3,7 +3,9 @@ param(
     [Parameter(Mandatory=$true)][string]$RunDirectory,
     [switch]$Resume,
     [switch]$NativeSmoke,
-    [switch]$FixtureLogs
+    [switch]$FixtureLogs,
+    [switch]$PlaybackDiagnostics,
+    [switch]$PerformanceMetrics
 )
 $ErrorActionPreference = 'Stop'
 Set-StrictMode -Version Latest
@@ -56,6 +58,7 @@ $overrides = @{
     NUVIO_DESKTOP_TEST_DATA_DIR=(Join-Path $run 'profile/native');
     JAVA_TOOL_OPTIONS=('-Duser.home="' + (Join-Path $run 'profile/home') + '" -XX:ErrorFile="' + (Join-Path $private 'hs_err_pid%p.log') + '"');
     NUVIO_DESKTOP_SMOKE_PLAYER_URL=$null; NUVIO_DESKTOP_SMOKE_REPORT=$null
+    NUVIO_PLAYBACK_DIAGNOSTICS=$(if ($PlaybackDiagnostics) { Join-Path $private "$session.playback.jsonl" } else { $null })
 }
 $started = [DateTime]::UtcNow
 $stdoutTarget = $null
@@ -90,7 +93,25 @@ try {
 } finally {
     foreach ($name in $saved.Keys) { [Environment]::SetEnvironmentVariable($name, $saved[$name], 'Process') }
 }
-$process.WaitForExit()
+if ($PerformanceMetrics) {
+    $metricsPath = Join-Path $private "$session.metrics.jsonl"
+    $previousCpu = 0.0
+    $previousTime = $started
+    while (-not $process.WaitForExit(1000)) {
+        try {
+            $process.Refresh()
+            $now = [DateTime]::UtcNow
+            $cpu = $process.TotalProcessorTime.TotalSeconds
+            $interval = ($now - $previousTime).TotalSeconds
+            [ordered]@{elapsedSeconds=($now-$started).TotalSeconds;
+                cpuPercent=100*($cpu-$previousCpu)/$interval/[Environment]::ProcessorCount;
+                workingSetBytes=$process.WorkingSet64; privateBytes=$process.PrivateMemorySize64;
+                handles=$process.HandleCount; threads=$process.Threads.Count} |
+                ConvertTo-Json -Compress | Add-Content -LiteralPath $metricsPath
+            $previousCpu=$cpu; $previousTime=$now
+        } catch [InvalidOperationException] { if (-not $process.HasExited) { throw } }
+    }
+} else { $process.WaitForExit() }
 try {
     [void]$stdoutDrain.GetAwaiter().GetResult()
     [void]$stderrDrain.GetAwaiter().GetResult()
