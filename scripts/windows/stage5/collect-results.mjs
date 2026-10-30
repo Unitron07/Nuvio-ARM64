@@ -46,6 +46,7 @@ export function summarize(records, metrics = []) {
           p.pause === 0 && r.pause === 0 && p['core-idle'] === 0 && r['core-idle'] === 0 &&
           p['video-params/w'] > 0 && r['video-params/w'] > 0 && p['video-params/h'] > 0 && r['video-params/h'] > 0 &&
           p['time-pos'] !== null && r['time-pos'] !== null &&
+          p.elapsedSeconds !== null && r.elapsedSeconds !== null &&
           r['time-pos'] > p['time-pos'] && r.elapsedSeconds > p.elapsedSeconds &&
           r['time-pos'] - p['time-pos'] <= (r.elapsedSeconds - p.elapsedSeconds) * 1.5 + 0.25) {
         s.progressingHardwareIntervals++;

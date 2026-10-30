@@ -8,6 +8,10 @@ const sample = {schema:'nuvio-playback-v1', session:1, architecture:'arm64', pha
   'video-params/w':1920, 'video-params/h':1080, pause:0, 'core-idle':0, 'time-pos':1, elapsedSeconds:1};
 const later = {...sample, 'time-pos':2, elapsedSeconds:2};
 assert.equal(summarize([sample,later]).sessions[0].progressingHardwareIntervals,1);
+for (const elapsedSeconds of [null, undefined, NaN, Infinity]) {
+  assert.equal(summarize([{...sample,elapsedSeconds},later]).sessions[0].progressingHardwareIntervals,0);
+  assert.equal(summarize([sample,{...later,elapsedSeconds}]).sessions[0].progressingHardwareIntervals,0);
+}
 for (const altered of [{current:'auto'},{current:'no'}, {current:'unavailable'}, {pause:1}, {'core-idle':1},
   {'video-params/w':null}, {'time-pos':100}, {'time-pos':null}, {elapsedSeconds:0}]) {
   assert.equal(summarize([sample,{...later,...altered}]).sessions[0].progressingHardwareIntervals,0);
