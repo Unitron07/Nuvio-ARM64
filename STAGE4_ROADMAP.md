@@ -1,5 +1,10 @@
 # Stage 4: touch usability and hardening
 
+Stage 4 PR #9 is now merged. The deferred decoder/performance/stability work is
+tracked in [Stage 5](STAGE5_ARM64_PERFORMANCE.md), with
+[owner instructions](STAGE5_SURFACE_VALIDATION.md). The historical Stage 4 readiness
+and acceptance evidence below is preserved.
+
 **Core touchscreen UX validated on Surface Pro 11 — ready for merge, subject to final checks.**
 
 The owner confirms Home/shelves, natural short swipes/momentum, tested details,

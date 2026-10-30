@@ -1,0 +1,743 @@
+{
+  "schema": "nuvio-stage5-standalone-evidence-v1",
+  "date": "2026-10-30",
+  "probeSourceCommit": "8c50f64197bf5c48a91ecf11cbd5747c78e998c0",
+  "device": "Microsoft Surface Pro, 11th Edition",
+  "cpu": "Snapdragon X 10-core X1P64100",
+  "gpu": "Qualcomm Adreno X1-85",
+  "driver": "31.0.170.0",
+  "os": "Windows ARM64 10.0.26300.0",
+  "java": "Microsoft ARM64 JDK 21.0.12.1+1",
+  "libmpvSha256": "f90cee7e3dbb0a12fbfa6b95af1fb2bb22dbfebf8422efc0324918ee75661850",
+  "conditions": "Standalone libmpv own visible window, gpu-next,gpu, gpu-api=auto, ao=null, loop-file=inf. Synthetic lavfi testsrc2, yuv420p, approximately 30 fps. H264 libx264 and HEVC libx265 ultrafast/crf28; AV1 libsvtav1 preset12/crf45; VP9 libvpx-vp9 realtime/cpu-used8. Four-second clips except ten-second H264 1080p and tiny two-second raw AVI. Concurrent desktop build/encoding; no controlled CPU/power comparison. No embedded Nuvio player, audio, HDR, sync or visual quality acceptance asserted.",
+  "cases": [
+    {
+      "id": "h264-auto",
+      "mediaSha256": "0a65ddb4b226e6437324d438163af1db01801dd15d1242c8628c588fd77cb9f1",
+      "observedSeconds": 14.7484044,
+      "schema": "nuvio-stage5-summary-v1",
+      "sessions": [
+        {
+          "id": 1,
+          "initialized": false,
+          "destroyReturned": false,
+          "errors": 0,
+          "samples": 15,
+          "progressingHardwareIntervals": 12,
+          "softwareSamples": 0,
+          "video": {
+            "video-params/w": {
+              "first": 1920,
+              "last": 1920,
+              "min": 1920,
+              "max": 1920
+            },
+            "video-params/h": {
+              "first": 1080,
+              "last": 1080,
+              "min": 1080,
+              "max": 1080
+            },
+            "container-fps": {
+              "first": 30.10033416748047,
+              "last": 30.10033416748047,
+              "min": 30.10033416748047,
+              "max": 30.10033416748047
+            },
+            "estimated-vf-fps": {
+              "first": 30.100334448160528,
+              "last": 30.00000000000008,
+              "min": 30.000000000000018,
+              "max": 30.10033444816054
+            },
+            "frame-drop-count": {
+              "first": 0,
+              "last": 1,
+              "min": 0,
+              "max": 1
+            },
+            "decoder-frame-drop-count": {
+              "first": 0,
+              "last": 0,
+              "min": 0,
+              "max": 0
+            }
+          },
+          "modes": [
+            "unavailable",
+            "d3d11va"
+          ],
+          "codecs": [
+            "unavailable",
+            "h264"
+          ],
+          "requestedModes": [
+            "auto"
+          ]
+        }
+      ],
+      "metrics": {
+        "cpuPercent": null,
+        "workingSetBytes": null,
+        "privateBytes": null,
+        "handles": null,
+        "threads": null
+      },
+      "limitations": "Runtime-reported decoder plus progressing playback; not a per-frame GPU trace. Destroy-returned is libmpv return only. CPU is launcher/JVM normalized to logical processors, excludes WebView2 children. Private bytes include managed and native allocations; growth is not a leak diagnosis. GPU, GC and energy require separate measurement."
+    },
+    {
+      "id": "h264-4k-auto",
+      "mediaSha256": "dbcc9f0f35dea7c5f2d92f76659b604222b0b3260b61d4170bb42da9ff75a126",
+      "observedSeconds": 9.548681,
+      "schema": "nuvio-stage5-summary-v1",
+      "sessions": [
+        {
+          "id": 1,
+          "initialized": false,
+          "destroyReturned": false,
+          "errors": 0,
+          "samples": 10,
+          "progressingHardwareIntervals": 6,
+          "softwareSamples": 0,
+          "video": {
+            "video-params/w": {
+              "first": 3840,
+              "last": 3840,
+              "min": 3840,
+              "max": 3840
+            },
+            "video-params/h": {
+              "first": 2160,
+              "last": 2160,
+              "min": 2160,
+              "max": 2160
+            },
+            "container-fps": {
+              "first": 30.252099990844727,
+              "last": 30.252099990844727,
+              "min": 30.252099990844727,
+              "max": 30.252099990844727
+            },
+            "estimated-vf-fps": {
+              "first": 30.21582733812949,
+              "last": 30.111524163568795,
+              "min": 30.00000000000008,
+              "max": 30.21582733812949
+            },
+            "frame-drop-count": {
+              "first": 0,
+              "last": 0,
+              "min": 0,
+              "max": 3
+            },
+            "decoder-frame-drop-count": {
+              "first": 0,
+              "last": 0,
+              "min": 0,
+              "max": 0
+            }
+          },
+          "modes": [
+            "unavailable",
+            "d3d11va"
+          ],
+          "codecs": [
+            "unavailable",
+            "h264"
+          ],
+          "requestedModes": [
+            "auto"
+          ]
+        }
+      ],
+      "metrics": {
+        "cpuPercent": null,
+        "workingSetBytes": null,
+        "privateBytes": null,
+        "handles": null,
+        "threads": null
+      },
+      "limitations": "Runtime-reported decoder plus progressing playback; not a per-frame GPU trace. Destroy-returned is libmpv return only. CPU is launcher/JVM normalized to logical processors, excludes WebView2 children. Private bytes include managed and native allocations; growth is not a leak diagnosis. GPU, GC and energy require separate measurement."
+    },
+    {
+      "id": "hevc-1080p-auto",
+      "mediaSha256": "94755bc61d4096a41ae51a814b566495eb810ce51429fcdab8d2982b1f3a76e7",
+      "observedSeconds": 9.6036959,
+      "schema": "nuvio-stage5-summary-v1",
+      "sessions": [
+        {
+          "id": 1,
+          "initialized": false,
+          "destroyReturned": false,
+          "errors": 0,
+          "samples": 10,
+          "progressingHardwareIntervals": 6,
+          "softwareSamples": 0,
+          "video": {
+            "video-params/w": {
+              "first": 1920,
+              "last": 1920,
+              "min": 1920,
+              "max": 1920
+            },
+            "video-params/h": {
+              "first": 1080,
+              "last": 1080,
+              "min": 1080,
+              "max": 1080
+            },
+            "container-fps": {
+              "first": 30.252099990844727,
+              "last": 30.252099990844727,
+              "min": 30.252099990844727,
+              "max": 30.252099990844727
+            },
+            "estimated-vf-fps": {
+              "first": 30.143540669856478,
+              "last": 30.08130081300813,
+              "min": 30.00000000000008,
+              "max": 30.252100840336137
+            },
+            "frame-drop-count": {
+              "first": 0,
+              "last": 0,
+              "min": 0,
+              "max": 1
+            },
+            "decoder-frame-drop-count": {
+              "first": 0,
+              "last": 0,
+              "min": 0,
+              "max": 0
+            }
+          },
+          "modes": [
+            "unavailable",
+            "d3d11va"
+          ],
+          "codecs": [
+            "unavailable",
+            "hevc"
+          ],
+          "requestedModes": [
+            "auto"
+          ]
+        }
+      ],
+      "metrics": {
+        "cpuPercent": null,
+        "workingSetBytes": null,
+        "privateBytes": null,
+        "handles": null,
+        "threads": null
+      },
+      "limitations": "Runtime-reported decoder plus progressing playback; not a per-frame GPU trace. Destroy-returned is libmpv return only. CPU is launcher/JVM normalized to logical processors, excludes WebView2 children. Private bytes include managed and native allocations; growth is not a leak diagnosis. GPU, GC and energy require separate measurement."
+    },
+    {
+      "id": "hevc-4k-auto",
+      "mediaSha256": "a2dbb5cdee5fe6102dd8695ce73318f51f3c54819b4b11aab915d79ff09b2f42",
+      "observedSeconds": 9.590536501,
+      "schema": "nuvio-stage5-summary-v1",
+      "sessions": [
+        {
+          "id": 1,
+          "initialized": false,
+          "destroyReturned": false,
+          "errors": 0,
+          "samples": 10,
+          "progressingHardwareIntervals": 6,
+          "softwareSamples": 0,
+          "video": {
+            "video-params/w": {
+              "first": 3840,
+              "last": 3840,
+              "min": 3840,
+              "max": 3840
+            },
+            "video-params/h": {
+              "first": 2160,
+              "last": 2160,
+              "min": 2160,
+              "max": 2160
+            },
+            "container-fps": {
+              "first": 30.252099990844727,
+              "last": 30.252099990844727,
+              "min": 30.252099990844727,
+              "max": 30.252099990844727
+            },
+            "estimated-vf-fps": {
+              "first": 30.131004366812245,
+              "last": 30.077120822622103,
+              "min": 30.00000000000008,
+              "max": 30.252100840336137
+            },
+            "frame-drop-count": {
+              "first": 0,
+              "last": 0,
+              "min": 0,
+              "max": 3
+            },
+            "decoder-frame-drop-count": {
+              "first": 0,
+              "last": 0,
+              "min": 0,
+              "max": 0
+            }
+          },
+          "modes": [
+            "unavailable",
+            "d3d11va"
+          ],
+          "codecs": [
+            "unavailable",
+            "hevc"
+          ],
+          "requestedModes": [
+            "auto"
+          ]
+        }
+      ],
+      "metrics": {
+        "cpuPercent": null,
+        "workingSetBytes": null,
+        "privateBytes": null,
+        "handles": null,
+        "threads": null
+      },
+      "limitations": "Runtime-reported decoder plus progressing playback; not a per-frame GPU trace. Destroy-returned is libmpv return only. CPU is launcher/JVM normalized to logical processors, excludes WebView2 children. Private bytes include managed and native allocations; growth is not a leak diagnosis. GPU, GC and energy require separate measurement."
+    },
+    {
+      "id": "av1-1080p-auto",
+      "mediaSha256": "ae9f9f3edfb051bd64dc1022a2d189a846fc6d719e5c1d70548a7715a5a4b3b7",
+      "observedSeconds": 9.3974998,
+      "schema": "nuvio-stage5-summary-v1",
+      "sessions": [
+        {
+          "id": 1,
+          "initialized": false,
+          "destroyReturned": false,
+          "errors": 0,
+          "samples": 10,
+          "progressingHardwareIntervals": 6,
+          "softwareSamples": 0,
+          "video": {
+            "video-params/w": {
+              "first": 1920,
+              "last": 1920,
+              "min": 1920,
+              "max": 1920
+            },
+            "video-params/h": {
+              "first": 1080,
+              "last": 1080,
+              "min": 1080,
+              "max": 1080
+            },
+            "container-fps": {
+              "first": 30.252099990844727,
+              "last": 30.252099990844727,
+              "min": 30.252099990844727,
+              "max": 30.252099990844727
+            },
+            "estimated-vf-fps": {
+              "first": 30.11583011583014,
+              "last": 30.083565459610032,
+              "min": 30.00000000000008,
+              "max": 30.252100840336137
+            },
+            "frame-drop-count": {
+              "first": 0,
+              "last": 0,
+              "min": 0,
+              "max": 1
+            },
+            "decoder-frame-drop-count": {
+              "first": 0,
+              "last": 0,
+              "min": 0,
+              "max": 0
+            }
+          },
+          "modes": [
+            "unavailable",
+            "d3d11va"
+          ],
+          "codecs": [
+            "unavailable",
+            "av1"
+          ],
+          "requestedModes": [
+            "auto"
+          ]
+        }
+      ],
+      "metrics": {
+        "cpuPercent": null,
+        "workingSetBytes": null,
+        "privateBytes": null,
+        "handles": null,
+        "threads": null
+      },
+      "limitations": "Runtime-reported decoder plus progressing playback; not a per-frame GPU trace. Destroy-returned is libmpv return only. CPU is launcher/JVM normalized to logical processors, excludes WebView2 children. Private bytes include managed and native allocations; growth is not a leak diagnosis. GPU, GC and energy require separate measurement."
+    },
+    {
+      "id": "av1-4k-auto",
+      "mediaSha256": "b9dd3ba0e32a6415874b4c5b138239f1667d68d2abd0dfc7975609f477ddbe92",
+      "observedSeconds": 9.491983299,
+      "schema": "nuvio-stage5-summary-v1",
+      "sessions": [
+        {
+          "id": 1,
+          "initialized": false,
+          "destroyReturned": false,
+          "errors": 0,
+          "samples": 10,
+          "progressingHardwareIntervals": 6,
+          "softwareSamples": 0,
+          "video": {
+            "video-params/w": {
+              "first": 3840,
+              "last": 3840,
+              "min": 3840,
+              "max": 3840
+            },
+            "video-params/h": {
+              "first": 2160,
+              "last": 2160,
+              "min": 2160,
+              "max": 2160
+            },
+            "container-fps": {
+              "first": 30.252099990844727,
+              "last": 30.252099990844727,
+              "min": 30.252099990844727,
+              "max": 30.252099990844727
+            },
+            "estimated-vf-fps": {
+              "first": 30.131004366812245,
+              "last": 30.08130081300813,
+              "min": 30.00000000000008,
+              "max": 30.252100840336137
+            },
+            "frame-drop-count": {
+              "first": 0,
+              "last": 0,
+              "min": 0,
+              "max": 0
+            },
+            "decoder-frame-drop-count": {
+              "first": 0,
+              "last": 0,
+              "min": 0,
+              "max": 0
+            }
+          },
+          "modes": [
+            "unavailable",
+            "d3d11va"
+          ],
+          "codecs": [
+            "unavailable",
+            "av1"
+          ],
+          "requestedModes": [
+            "auto"
+          ]
+        }
+      ],
+      "metrics": {
+        "cpuPercent": null,
+        "workingSetBytes": null,
+        "privateBytes": null,
+        "handles": null,
+        "threads": null
+      },
+      "limitations": "Runtime-reported decoder plus progressing playback; not a per-frame GPU trace. Destroy-returned is libmpv return only. CPU is launcher/JVM normalized to logical processors, excludes WebView2 children. Private bytes include managed and native allocations; growth is not a leak diagnosis. GPU, GC and energy require separate measurement."
+    },
+    {
+      "id": "vp9-1080p-auto",
+      "mediaSha256": "fcc85af45c3c8e3e2e8eb84c4adb26192fafee0e5be7aebecc932e9983111647",
+      "observedSeconds": 9.4621543,
+      "schema": "nuvio-stage5-summary-v1",
+      "sessions": [
+        {
+          "id": 1,
+          "initialized": false,
+          "destroyReturned": false,
+          "errors": 0,
+          "samples": 10,
+          "progressingHardwareIntervals": 5,
+          "softwareSamples": 0,
+          "video": {
+            "video-params/w": {
+              "first": 1920,
+              "last": 1920,
+              "min": 1920,
+              "max": 1920
+            },
+            "video-params/h": {
+              "first": 1080,
+              "last": 1080,
+              "min": 1080,
+              "max": 1080
+            },
+            "estimated-vf-fps": {
+              "first": 30.024601416898104,
+              "last": 30.014502506866748,
+              "min": 29.999842086485646,
+              "max": 30.024601416898104
+            },
+            "frame-drop-count": {
+              "first": 0,
+              "last": 0,
+              "min": 0,
+              "max": 1
+            },
+            "decoder-frame-drop-count": {
+              "first": 0,
+              "last": 0,
+              "min": 0,
+              "max": 0
+            }
+          },
+          "modes": [
+            "unavailable",
+            "d3d11va"
+          ],
+          "codecs": [
+            "unavailable",
+            "vp9"
+          ],
+          "requestedModes": [
+            "auto"
+          ]
+        }
+      ],
+      "metrics": {
+        "cpuPercent": null,
+        "workingSetBytes": null,
+        "privateBytes": null,
+        "handles": null,
+        "threads": null
+      },
+      "limitations": "Runtime-reported decoder plus progressing playback; not a per-frame GPU trace. Destroy-returned is libmpv return only. CPU is launcher/JVM normalized to logical processors, excludes WebView2 children. Private bytes include managed and native allocations; growth is not a leak diagnosis. GPU, GC and energy require separate measurement."
+    },
+    {
+      "id": "vp9-4k-auto",
+      "mediaSha256": "01243dc83625115320df1623afbf66ef569da41723437d8957461dea424e9180",
+      "observedSeconds": 9.623114001,
+      "schema": "nuvio-stage5-summary-v1",
+      "sessions": [
+        {
+          "id": 1,
+          "initialized": false,
+          "destroyReturned": false,
+          "errors": 0,
+          "samples": 10,
+          "progressingHardwareIntervals": 6,
+          "softwareSamples": 0,
+          "video": {
+            "video-params/w": {
+              "first": 3840,
+              "last": 3840,
+              "min": 3840,
+              "max": 3840
+            },
+            "video-params/h": {
+              "first": 2160,
+              "last": 2160,
+              "min": 2160,
+              "max": 2160
+            },
+            "estimated-vf-fps": {
+              "first": 30.021330875478082,
+              "last": 30.011975202162855,
+              "min": 29.999868871941857,
+              "max": 30.063616760466346
+            },
+            "frame-drop-count": {
+              "first": 0,
+              "last": 0,
+              "min": 0,
+              "max": 0
+            },
+            "decoder-frame-drop-count": {
+              "first": 0,
+              "last": 0,
+              "min": 0,
+              "max": 0
+            }
+          },
+          "modes": [
+            "unavailable",
+            "d3d11va"
+          ],
+          "codecs": [
+            "unavailable",
+            "vp9"
+          ],
+          "requestedModes": [
+            "auto"
+          ]
+        }
+      ],
+      "metrics": {
+        "cpuPercent": null,
+        "workingSetBytes": null,
+        "privateBytes": null,
+        "handles": null,
+        "threads": null
+      },
+      "limitations": "Runtime-reported decoder plus progressing playback; not a per-frame GPU trace. Destroy-returned is libmpv return only. CPU is launcher/JVM normalized to logical processors, excludes WebView2 children. Private bytes include managed and native allocations; growth is not a leak diagnosis. GPU, GC and energy require separate measurement."
+    },
+    {
+      "id": "h264-software",
+      "mediaSha256": "0a65ddb4b226e6437324d438163af1db01801dd15d1242c8628c588fd77cb9f1",
+      "observedSeconds": 15.1591537,
+      "schema": "nuvio-stage5-summary-v1",
+      "sessions": [
+        {
+          "id": 1,
+          "initialized": false,
+          "destroyReturned": false,
+          "errors": 0,
+          "samples": 15,
+          "progressingHardwareIntervals": 0,
+          "softwareSamples": 14,
+          "video": {
+            "video-params/w": {
+              "first": 1920,
+              "last": 1920,
+              "min": 1920,
+              "max": 1920
+            },
+            "video-params/h": {
+              "first": 1080,
+              "last": 1080,
+              "min": 1080,
+              "max": 1080
+            },
+            "container-fps": {
+              "first": 30.10033416748047,
+              "last": 30.10033416748047,
+              "min": 30.10033416748047,
+              "max": 30.10033416748047
+            },
+            "estimated-vf-fps": {
+              "first": 30.100334448160524,
+              "last": 30.000000000000075,
+              "min": 30.000000000000025,
+              "max": 30.100334448160535
+            },
+            "frame-drop-count": {
+              "first": 0,
+              "last": 0,
+              "min": 0,
+              "max": 4
+            },
+            "decoder-frame-drop-count": {
+              "first": 0,
+              "last": 0,
+              "min": 0,
+              "max": 0
+            }
+          },
+          "modes": [
+            "unavailable",
+            "no"
+          ],
+          "codecs": [
+            "unavailable",
+            "h264"
+          ],
+          "requestedModes": [
+            "no"
+          ]
+        }
+      ],
+      "metrics": {
+        "cpuPercent": null,
+        "workingSetBytes": null,
+        "privateBytes": null,
+        "handles": null,
+        "threads": null
+      },
+      "limitations": "Runtime-reported decoder plus progressing playback; not a per-frame GPU trace. Destroy-returned is libmpv return only. CPU is launcher/JVM normalized to logical processors, excludes WebView2 children. Private bytes include managed and native allocations; growth is not a leak diagnosis. GPU, GC and energy require separate measurement."
+    },
+    {
+      "id": "raw-auto",
+      "mediaSha256": "25ba2b8b439f1a4147cbbedeb76f77707aed7a97f946be62d5640507d8328803",
+      "observedSeconds": 7.3780946,
+      "schema": "nuvio-stage5-summary-v1",
+      "sessions": [
+        {
+          "id": 1,
+          "initialized": false,
+          "destroyReturned": false,
+          "errors": 0,
+          "samples": 8,
+          "progressingHardwareIntervals": 0,
+          "softwareSamples": 7,
+          "video": {
+            "video-params/w": {
+              "first": 64,
+              "last": 64,
+              "min": 64,
+              "max": 64
+            },
+            "video-params/h": {
+              "first": 36,
+              "last": 36,
+              "min": 36,
+              "max": 36
+            },
+            "container-fps": {
+              "first": 10,
+              "last": 10,
+              "min": 10,
+              "max": 10
+            },
+            "estimated-vf-fps": {
+              "first": 10,
+              "last": 10,
+              "min": 9.999999999999996,
+              "max": 10
+            },
+            "frame-drop-count": {
+              "first": 0,
+              "last": 0,
+              "min": 0,
+              "max": 0
+            },
+            "decoder-frame-drop-count": {
+              "first": 0,
+              "last": 0,
+              "min": 0,
+              "max": 0
+            }
+          },
+          "modes": [
+            "unavailable",
+            "no"
+          ],
+          "codecs": [
+            "unavailable",
+            "rawvideo"
+          ],
+          "requestedModes": [
+            "auto"
+          ]
+        }
+      ],
+      "metrics": {
+        "cpuPercent": null,
+        "workingSetBytes": null,
+        "privateBytes": null,
+        "handles": null,
+        "threads": null
+      },
+      "limitations": "Runtime-reported decoder plus progressing playback; not a per-frame GPU trace. Destroy-returned is libmpv return only. CPU is launcher/JVM normalized to logical processors, excludes WebView2 children. Private bytes include managed and native allocations; growth is not a leak diagnosis. GPU, GC and energy require separate measurement."
+    }
+  ]
+}

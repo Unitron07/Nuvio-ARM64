@@ -14,5 +14,7 @@ Copy-Item -LiteralPath $PSScriptRoot -Destination (Join-Path $output 'scripts/wi
 foreach ($name in @('STAGE5_ARM64_PERFORMANCE.md','STAGE5_HARDWARE_DECODING.md','STAGE5_SURFACE_VALIDATION.md')) {
     Copy-Item -LiteralPath (Join-Path $repo $name) -Destination $output
 }
+New-Item -ItemType Directory -Force (Join-Path $output 'docs/stage5') | Out-Null
+Copy-Item -LiteralPath "$repo/docs/stage5/standalone-surface-results.json" -Destination (Join-Path $output 'docs/stage5')
 Compress-Archive -Path (Join-Path $output '*') -DestinationPath "$output.zip" -Force
 Write-Host "Stage 5 matching owner tools: $output.zip"

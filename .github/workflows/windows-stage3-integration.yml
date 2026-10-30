@@ -3,6 +3,7 @@ on:
   pull_request:
     paths:
       - STAGE4*.md
+      - STAGE5*.md
       - composeApp/src/commonMain/**
       - composeApp/src/commonTest/**
       - composeApp/src/desktopMain/**
@@ -48,9 +49,13 @@ jobs:
           ./scripts/windows/stage3/run-tests.ps1 -QuickJsDll "build/windows-quickjs/${{ matrix.arch }}/libquickjs.dll" -ExpectedArch '${{ matrix.osArch }}'
           ./scripts/windows/stage3/test-owner-package.ps1
           node scripts/windows/test-player-menu-dismissal.mjs
+          ./scripts/windows/stage5/test-scripts.ps1
       - name: Package repeatable owner tools
         shell: pwsh
         run: ./scripts/windows/stage3/Pack-OwnerTools.ps1 -OutputDirectory build/stage3-owner-tools
+      - name: Package Stage 5 tools from the exact application source
+        shell: pwsh
+        run: ./scripts/windows/stage5/Pack-OwnerTools.ps1 -OutputDirectory build/stage5-owner-tools -SourceCommit '${{ github.event.pull_request.head.sha || github.sha }}'
       - name: Record evidence scope
         if: always()
         shell: pwsh
@@ -70,5 +75,6 @@ jobs:
             composeApp/build/reports/tests/desktopTest/
             build/STAGE3_STATUS.txt
             build/stage3-owner-tools.zip
+            build/stage5-owner-tools.zip
           retention-days: 7
           if-no-files-found: warn

@@ -3,6 +3,7 @@ on:
   pull_request:
     paths:
       - STAGE4*.md
+      - STAGE5*.md
       - scripts/windows/**
       - .github/workflows/windows-quickjs.yml
   workflow_dispatch:

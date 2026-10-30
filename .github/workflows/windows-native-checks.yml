@@ -3,6 +3,7 @@ on:
   pull_request:
     paths:
       - STAGE4*.md
+      - STAGE5*.md
       - scripts/windows/**
       - composeApp/build.gradle.kts
       - .github/workflows/windows-native-checks.yml
@@ -17,3 +18,11 @@ jobs:
       - name: Reject mixed architectures and malformed native inputs
         shell: powershell
         run: ./scripts/windows/test-pe-architecture.ps1
+      - name: Test decoder diagnostic boundary on x64
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force build | Out-Null
+          $vswhere = "${env:ProgramFiles(x86)}/Microsoft Visual Studio/Installer/vswhere.exe"
+          $vcvars = & $vswhere -latest -products '*' -find 'VC/Auxiliary/Build/vcvars64.bat' | Select-Object -First 1
+          cmd /c "`"$vcvars`" && cl /nologo /EHsc /std:c++17 scripts/windows/stage5/test-diagnostics.cpp /Fe:build/test-diagnostics.exe /Fo:build/test-diagnostics.obj && build\test-diagnostics.exe"
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }

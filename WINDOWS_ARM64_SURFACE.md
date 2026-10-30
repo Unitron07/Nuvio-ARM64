@@ -1,9 +1,14 @@
 # Windows ARM64 and Surface Pro 11
 
-Status: **Core touchscreen UX validated on Surface Pro 11 — ready for merge, subject to final checks.**
+Status: **Stage 4 merged; Stage 5 decoder/performance/stability validation in progress.**
+Stage 4 PR #9 merged at `2f71f1c8a4585457427c540ec2de3cc260768d72`.
+See [Stage 5 decoder findings](STAGE5_HARDWARE_DECODING.md),
+[performance/power methodology](STAGE5_ARM64_PERFORMANCE.md) and
+[Surface owner instructions](STAGE5_SURFACE_VALIDATION.md). Physical decoder,
+long-duration, battery and newly generated progress acceptance remain pending.
 See [Stage 4 final validation](STAGE4_FINAL_VALIDATION.md) for the owner's tested
 scrolling, menu/navigation and integration paths, cache A/B observations, automated
-evidence and nonblocking limits. PR #9 remains unmerged; the owner will merge manually.
+evidence and nonblocking limits. Historical readiness statements below retain their dates.
 
 Stage 3 PR #4 is merged. Native launch/exit, account/addon sync, existing resume data
 and real debrid video/audio remain owner-confirmed. Authentication uses the existing
