@@ -1,7 +1,53 @@
 # Stage 5: exact Surface owner procedure
 
-Acceptance remains pending until physical results are recorded. Use the development
-image and `stage5-owner-tools.zip` from the same PR head SHA. The image's
+**Initial ARM64 hardware acceleration and diagnostic validation complete. Advanced
+performance, battery and long-duration stability work deferred.**
+The owner has accepted this narrower milestone and authorized PR #10 readiness
+after focused review and current-head CI. The remaining procedures below are future
+hardening, not unperformed tests presented as passes or automatic merge blockers.
+
+## Owner acceptance and evidence provenance
+
+The owner tested matching Stage 5 ARM64 image/tools at
+`b62e5550781aa52b2f70bb8602283c9e026eb975`. The supplied summary of
+stage5-safe-results.json and stage3-owner-results(3).zip reports approximately five
+minutes of full-application use. The raw files were not attached to this finalization
+request; no new independent raw-file calculation, recording or hardware replay is
+claimed. Keep private profiles/raw archives out of the repository.
+
+| Owner result | Observation |
+| --- | --- |
+| Architecture/source | ARM64 / b62e5550781aa52b2f70bb8602283c9e026eb975 |
+| App exit / JVM crash reports / playback errors | 0 / 0 / 0 |
+| Player initialized / native destruction returned | yes / yes |
+| Full-app video | AV1, 1920 x 1080, approximately 23.976 FPS |
+| Requested / active decoder | auto / d3d11va |
+| Playback samples / qualifying progressing hardware intervals | 57 / 40 |
+| Software samples / decoder frame-drop counter | 0 / 0 |
+| Maximum reported video frame-drop counter | 5; not a cumulative total |
+| Process-tree samples / CPU mean / peak / last | 267 / approximately 2.40% / 23.41% / 1.35% |
+
+This validates initial active AV1 hardware decoding and clean exit for the tested
+session. It is runtime-reported evidence rather than a per-frame GPU trace, and
+does not establish zero presentation drops, comprehensive codec support, battery
+benefit or leak freedom. Whole-session CPU includes startup/navigation; the
+[performance ledger](STAGE5_ARM64_PERFORMANCE.md) records memory/resource measurements
+and their limitations. The owner accepts preservation of Stage 4 functionality for
+this milestone; no new exhaustive mixed-input/touchscreen replay is invented.
+
+Evidence sources stay separate:
+
+| Source | Scope |
+| --- | --- |
+| Codex standalone Surface probes | short generated H.264/HEVC/AV1/VP9 1080p/4K, own libmpv window, null audio |
+| Codex embedded player smokes | generated silent H.264; source-built screen and exact b62e5550 packaged smoke, distinct durations/metrics |
+| Owner full-application test | approximately five-minute b62e5550 session, embedded AV1, whole-session measurements above |
+| Automated ARM64/x64 CI | property/privacy, real JNI/native/HTTP/HTTPS/image and integration checks; not a physical GPU trace |
+| Deferred work | #11 endurance/resources; #12 codec/HDR/fallback; #13 CPU/GPU/power; #14 new progress/account/debrid; #15 JNI hardening |
+
+## Future validation toolkit
+
+Use the development image and `stage5-owner-tools.zip` from the same PR head SHA. The image's
 STAGE3_IMAGE.json sourceCommit must equal tools scripts/windows/stage5/SOURCE.json.
 The launcher enforces this match. No credentials or commercial media belong in CI.
 
@@ -70,7 +116,7 @@ profile/pixel format/fps and hash. Do not label SDR testsrc with HDR metadata an
 that valid HDR; use a properly authored authorized HDR sample. Add an owner-created
 subtitle and known sync cue; a sine alone cannot quantify A/V synchronization.
 
-## Required sessions
+## Deferred validation procedures
 
 An optional standalone libmpv check is included. It requires a full native ARM64
 JDK 21 (the app's trimmed runtime cannot launch Java source), the image's JNA JAR,
@@ -115,20 +161,32 @@ the isolated profile if desired; verify new progress synchronization on another
 trusted client. Existing Continue Watching data does not satisfy this test. Never
 put tokens/account identifiers in result text.
 
-## Owner checklist
+## Milestone acceptance and deferred owner checklist
 
-- [ ] Native launch/normal exit, exact source SHA and architecture recorded.
-- [ ] H.264/HEVC 1080p/4K; AV1/VP9 where supported; mode evidence recorded.
+- [x] Initial ARM64 startup, player initialization and clean owner-session exit recorded.
+- [x] Owner full-app AV1 1080p D3D11VA runtime evidence recorded at exact b62e5550.
+- [x] Privacy-safe opt-in decoder and process-tree diagnostics retained.
+- [x] Corrected owner-only Preferences isolation retained; fresh-JVM persistence/fail-closed tests preserved.
+- [x] Separate Codex standalone/embedded and CI evidence retained with limitations.
+- [x] Owner accepts this narrower milestone; Stage 4 code/regression coverage is preserved.
+
+The remaining original checklist items are deferred, not failed or passed:
+
+- [ ] Expanded full-app H.264/HEVC/AV1/VP9 profile/resolution/container coverage beyond the initial evidence.
 - [ ] Default software fallback visibly works; unknown properties are not passes.
 - [ ] Seeking/fullscreen, subtitles/audio and A/V sync checked.
 - [ ] Ten actual player sessions and settled memory/handle trends recorded.
 - [ ] 60–120 minute playback evaluated; errors/recovery and exit checked.
-- [ ] CPU/memory sampled; Video Decode/3D GPU evidence or limitation recorded.
+- [ ] Controlled CPU/memory comparisons and Video Decode/3D engine measurements beyond exploratory session metrics.
 - [ ] Controlled power/battery protocol completed where feasible.
 - [ ] Newly generated progress survives restart; new sync tested separately.
 - [ ] Account/addon sync, real debrid and correct headers remain functional.
-- [ ] Stage 4 touchscreen, sources/sidebar, keyboard/mouse/trackpad remain functional.
 - [ ] Review stage5-safe-results.json; share no profile, raw logs, dumps or credentials.
 
-Stage 5 stays draft until owner acceptance and final-head CI pass. No merge/release
-is authorized. Physical acceptance cannot be inferred from a successful build.
+Track endurance/resource work in [#11](https://github.com/Unitron07/Nuvio-ARM64/issues/11),
+codec/HDR/fallback in [#12](https://github.com/Unitron07/Nuvio-ARM64/issues/12),
+controlled CPU/GPU/power in [#13](https://github.com/Unitron07/Nuvio-ARM64/issues/13),
+new progress and further authenticated regressions in [#14](https://github.com/Unitron07/Nuvio-ARM64/issues/14),
+and JNI hardening in [#15](https://github.com/Unitron07/Nuvio-ARM64/issues/15).
+Mark PR #10 ready after final focused review and passing final-head checks.
+The owner will merge manually; no merge, release, tag or public installer is authorized.

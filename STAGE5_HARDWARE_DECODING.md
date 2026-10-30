@@ -1,8 +1,38 @@
 # Stage 5: Windows ARM64 decoder investigation
 
-Status: instrumentation implemented; short standalone Snapdragon D3D11VA evidence
-recorded below. Full embedded application acceptance remains pending.
+**Initial ARM64 hardware acceleration and diagnostic validation complete. Advanced
+performance, battery and long-duration stability work deferred.**
+The owner explicitly accepts this narrower Stage 5 milestone for PR #10. This does
+not mark all original acceptance criteria passed or establish public-release readiness.
 Baseline: main `2f71f1c8a4585457427c540ec2de3cc260768d72`, merged Stage 4 PR #9.
+
+## Owner full-application AV1 evidence
+
+The owner tested matching image/tools at `b62e5550781aa52b2f70bb8602283c9e026eb975`
+on Surface Pro 11 / Snapdragon X / Windows ARM64, using the privacy-safe diagnostics.
+The owner supplied a summary of stage5-safe-results.json and stage3-owner-results(3).zip
+for this finalization. Those raw files were not attached to this finalization request;
+the values below are owner-supplied observations, not a new independent replay or
+recalculation. Private profiles, media identifiers and raw archives are not committed.
+
+| Field | Owner observation |
+| --- | --- |
+| Codec / dimensions / frame rate | AV1 / 1920 x 1080 / approximately 23.976 FPS |
+| Requested / active hardware mode | auto / d3d11va |
+| Telemetry / qualifying progressing hardware intervals | 57 / 40 |
+| Software decoder samples / decoder frame-drop counter | 0 / 0 |
+| Maximum sampled video frame-drop counter | 5 |
+| Playback errors | 0 |
+| Player initialized / native destruction returned | yes / yes |
+| Application exit / JVM crash reports | 0 / 0 |
+
+This is strong runtime evidence of active D3D11VA during progressing **1080p AV1**
+playback through the full application. It is not a per-frame GPU trace. The video
+drop counter reached 5; that sampled maximum is not a cumulative total and does
+not support a zero-presentation-drop claim. The session lasted approximately five
+minutes and establishes an initial clean exit, not endurance or leak freedom.
+It does not validate every codec/profile/bit depth/container or software-failure case.
+See [owner performance and acceptance ledger](STAGE5_SURFACE_VALIDATION.md).
 
 ## Findings and plan
 
@@ -20,7 +50,7 @@ Unified-memory detection also selects the existing fast profile. No new GPU poli
 or quality/cache/gesture optimization is justified without comparative measurements.
 An unused `hwdecLogged` member was not functioning decoder evidence.
 
-Plan: instrument the actual bridge, test privacy/property handling, increase the
+Original implementation plan: instrument the actual bridge, test privacy/property handling, increase the
 existing native HTTP lifecycle smoke to ten cycles, package matching owner tools,
 then measure the codec matrix and power on the owner's device. Do not change the
 working defaults merely because acceleration has not yet been measured.
@@ -71,7 +101,8 @@ second, the existing mpv event thread queries a fixed property set. No extra thr
 or polling exists when disabled. Numeric unavailable/nonfinite values become null;
 codec/decoder/pixel/hardware values use exact allowlists, unknown values become
 `other`. No raw logs, titles, paths, URLs, metadata, headers or account fields are
-exported. Disk retention stops at 16 MiB per file. File/property failures cannot
+exported. Retention stops at approximately 16 MiB per file (the last record can
+cross the threshold). File/property failures cannot
 interrupt playback. Source commit is joined from the checked image/session manifest.
 
 `initialized` means libmpv initialization/load command returned, not first frame.
@@ -123,22 +154,25 @@ compilation/encoding and very short clips preclude performance comparisons.
 The same H.264 1080p file with `hwdec=no` progressed with `hwdec-current=no`.
 Generated raw AVI with automatic hardware mode also progressed with `no`, demonstrating
 software selection for a non-hardware codec. This does not inject a failing hardware
-decoder or prove recovery from every driver error. Embedded application telemetry,
-long sessions, audio, profile/bit-depth/HDR matrix and power remain pending.
+decoder or prove recovery from every driver error. The owner AV1 result and Codex
+embedded H.264 evidence are separate from the standalone matrix. Extended sessions,
+audio, profile/bit-depth/HDR coverage and power remain deferred.
 
-## Full application codec matrix: physical acceptance pending
+## Full application coverage: initial evidence and deferred cases
 
 | Codec | 1080p | 4K | Extra cases |
 | --- | --- | --- | --- |
-| H.264/AVC | pending | pending | 24/30/60 fps, 8-bit; uncommon profiles separately |
-| HEVC | pending | pending | Main/Main10, SDR/HDR, 24/30/60 fps |
-| AV1 | pending | pending where supported | 8/10-bit, film grain separately |
-| VP9 | pending | pending where supported | profiles 0/2, 8/10-bit |
+| H.264/AVC | Codex embedded smoke; full coverage deferred | standalone only | 24/30/60 fps, uncommon profiles deferred |
+| HEVC | standalone only | standalone only | full app Main/Main10, SDR/HDR, frame rates deferred |
+| AV1 | owner embedded 1080p near 23.976 FPS | standalone only | other profiles/bit depths/film grain deferred |
+| VP9 | standalone only | standalone only | full app profiles 0/2, 8/10-bit deferred |
 
 For every row record file hash, locally assigned case ID, codec/profile, dimensions,
 fps/bit depth/container, requested/current decoder, visible playback, A/V sync,
 subtitle/audio selection, seeking, fullscreen, failures and default-mode software
 fallback. No supported codec/profile is asserted from the chip name or CPU architecture.
+Expanded codec and failure/fallback validation is tracked in [#12](https://github.com/Unitron07/Nuvio-ARM64/issues/12),
+as nonblocking hardening for the accepted initial milestone.
 Existing Stage 3/4 owner reports establish MKV video/audio and real debrid playback,
 not a codec/hardware matrix. Headless raw AVI software CI is explicitly separate.
 
@@ -154,6 +188,7 @@ boundaries; adding checks only to silence `-Xcheck:jni` would not prove safe cle
 Defer a separately scoped source-copy patch with thrown-callback, allocation/error,
 collection conversion and cleanup tests; retain the current exception/recovery suite
 on ARM64 and x64. No working engine/native ownership is rewritten in Stage 5.
+This inherited risk is tracked separately in [#15](https://github.com/Unitron07/Nuvio-ARM64/issues/15).
 
 The player checks/clears Java callback exceptions, joins native threads with bounded
 detach fallback and closes WebView2 on its UI thread. A detached, wedged worker may

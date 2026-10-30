@@ -1,9 +1,43 @@
 # Stage 5: performance, power and stability
 
-Stage 5 remains in progress. No CPU/GPU/energy improvement, long-duration stability
-or absence of leaks is claimed before measurements. The merged Stage 4 baseline is
+**Initial ARM64 hardware acceleration and diagnostic validation complete. Advanced
+performance, battery and long-duration stability work deferred.**
+The owner accepts this narrower milestone for PR #10. This is not completion of
+all original Stage 5 acceptance criteria or broad public-distribution readiness.
+No comparative CPU/GPU/energy improvement, endurance or leak freedom is claimed.
+The merged Stage 4 baseline is
 `2f71f1c8a4585457427c540ec2de3cc260768d72`; Stage 4's owner cache observations remain
 in STAGE4_FINAL_VALIDATION.md with their original uncontrolled-workload limitations.
+
+## Owner application session at b62e5550
+
+Owner-supplied summary from matching image/tools at
+`b62e5550781aa52b2f70bb8602283c9e026eb975`: approximately five minutes on Surface Pro 11,
+267 application process-tree samples, exit 0, zero JVM crash reports and playback
+errors, player initialization and native destruction returned. Embedded AV1 1080p
+near 23.976 FPS reported auto requested / d3d11va active across 40 qualifying
+intervals from 57 playback samples. This is initial stability/hardware evidence,
+not an endurance result. Raw JSON/ZIP were not attached to this finalization request;
+the supplied summary is recorded without claiming independent raw-file analysis.
+
+CPU mean approximately **2.40%**, peak **23.41%**, last **1.35%**, normalized across
+logical processors. This covers startup/navigation and the application session,
+not solely steady-state video playback. It does not establish a hardware-decoding
+power benefit or a measured optimization over Stage 4/software decoding.
+
+| Process-tree measure | Average | Peak | Final sample |
+| --- | --- | --- | --- |
+| Working set | approximately 1,173 MiB | approximately 2,204 MiB | approximately 709 MiB |
+| Private bytes | approximately 1,202 MiB | approximately 2,058 MiB | approximately 746 MiB |
+| Handles | not supplied | 4,317 | 1,243 |
+| Threads | not supplied | 239 | 70 |
+| Processes | not supplied | 8 | 2 |
+
+Summed working sets can double-count shared pages; private bytes include managed
+and native allocations. The temporary peak warrants future monitoring. The decrease
+at the final sample establishes neither a leak nor absence of leaks; one session
+does not establish repeated-session resource growth. No memory optimization is proven.
+The earlier Codex short-smoke/standalone measurements remain separate evidence.
 
 ## Implemented measurement support
 
@@ -94,16 +128,21 @@ is not final-head player acceptance. Process discovery adds observer overhead.
 
 ## Stability and evidence ledger
 
+The following deferred work is **not completed** and is not an automatic blocker
+for the owner-approved narrower milestone. Final merge-review readiness still
+requires a focused diff and passing current-head automated checks.
+
 | Check | Implementation/evidence boundary | Status |
 | --- | --- | --- |
-| Property parsing/privacy | C++ injected-source tests and Node collector tests | run results recorded in PR |
-| Native repeated playback | ten software HTTP cycles; three HTTPS cycles in ARM64 CI | final-head CI required |
-| Ten actual app sessions/fullscreen | owner checklist | pending |
-| Sustained 60–120 minute playback | owner checklist, raw metrics | pending |
-| GPU/codec matrix | actual decoder/progress plus visible validation | pending |
-| CPU/WS/private bytes | collection implemented; comparable device measurements | pending |
-| Energy/battery | controlled protocol; no precise values fabricated | pending |
-| New progress after restart/sync | isolated owner account workflow | pending |
+| Property parsing/privacy | C++/Node tests; unknown fields remain unknown | implemented; final-head checks recorded in PR #10 |
+| Native repeated playback | ten software HTTP cycles; three HTTPS cycles in ARM64 CI | automated coverage retained; not ten UI sessions |
+| Initial full-app hardware/stability | owner AV1 evidence and clean exit at b62e5550 | accepted for initial milestone |
+| Ten actual app sessions and 60–120 minute playback | memory/handle growth and native cleanup | deferred [#11](https://github.com/Unitron07/Nuvio-ARM64/issues/11) |
+| Full codec/profile/container/fps, 10-bit/HDR and fallback matrix | owner AV1 and separate Codex probes are partial coverage | deferred [#12](https://github.com/Unitron07/Nuvio-ARM64/issues/12) |
+| Controlled hardware/software CPU and GPU engine/GC measurements | whole-session exploratory metrics are available | deferred [#13](https://github.com/Unitron07/Nuvio-ARM64/issues/13) |
+| Battery/power | repeatable protocol below; no energy benefit measured | deferred [#13](https://github.com/Unitron07/Nuvio-ARM64/issues/13) |
+| New progress after restart/sync and additional account/debrid regressions | existing resume data is a different result | deferred [#14](https://github.com/Unitron07/Nuvio-ARM64/issues/14) |
+| QuickJS JNI exception discipline | inherited native risk, not a new Stage 5 crash report | deferred [#15](https://github.com/Unitron07/Nuvio-ARM64/issues/15) |
 
 For ten actual sessions, record per-session post-close idle memory/handles after a
 consistent settling interval, and compare first/last/trend. For sustained playback
@@ -123,3 +162,16 @@ H.264/HEVC/AV1/VP9 at 1080p/4K; software H.264 and automatic raw-AVI controls pr
 with `hwdec-current=no`. See STAGE5_HARDWARE_DECODING.md for exact limits and hashes.
 This is not final-head embedded application or long-duration acceptance. No measured
 CPU/GPU-utilization/energy benefit is claimed from these short, concurrent-workload runs.
+
+## Finalization review
+
+The full PR diff and empty review/comment/thread lists were reviewed. Existing
+automatic decoder selection, fallback/preference semantics, source headers, native
+lifecycle/embedding workaround, WebView2/controls, cache bounds and Stage 4 touch
+code remain unchanged during finalization. No critical introduced defect was found.
+One collector guard now rejects a progress interval when either elapsed timestamp
+is unavailable/nonfinite; a failing-then-passing regression covers both endpoints.
+This is malformed-input correctness, not a decoder-policy or performance change.
+The opt-in diagnostics and owner-only Preferences isolation helper are retained.
+Final-head CI and source-bound artifacts are recorded in PR #10; owner hardware
+results retain their exact b62e5550 provenance and were not rerun for finalization.
