@@ -12,6 +12,9 @@ on:
         description: Development branch
         default: Dev
         type: string
+      upstream_tag:
+        description: Optional exact upstream release tag (overrides development branch)
+        type: string
 permissions:
   contents: write
   pull-requests: write
@@ -35,4 +38,5 @@ jobs:
           GH_TOKEN: ${{ github.token }}
           UPSTREAM: ${{ inputs.upstream_repository || 'NuvioMedia/NuvioDesktop' }}
           UPSTREAM_BRANCH: ${{ inputs.upstream_branch || 'Dev' }}
-        run: python scripts/automation/downstream.py sync --upstream "$UPSTREAM" --branch "$UPSTREAM_BRANCH"
+          UPSTREAM_TAG: ${{ inputs.upstream_tag }}
+        run: python scripts/automation/downstream.py sync --upstream "$UPSTREAM" --branch "$UPSTREAM_BRANCH" --tag "$UPSTREAM_TAG"

@@ -29,7 +29,8 @@ Public publication and automatic installation are deliberately unimplemented.
 
 `upstream-sync.yml` checks every six hours (`17 */6 * * *`, UTC), or via Actions →
 Upstream synchronization proposals → Run workflow → main. Inputs default to
-`NuvioMedia/NuvioDesktop`, `Dev`. Only the downstream repository and main execute
+`NuvioMedia/NuvioDesktop`, `Dev`. Optional upstream_tag selects an exact release
+source instead; the release monitor dispatches it once per unintegrated candidate. Only the downstream repository and main execute
 the maintenance job. Schedules begin only after owner merges the Stage 6 PR;
 this implementation does not merge it. Configure repository Actions permissions
 to allow GITHUB_TOKEN to create pull requests. No PAT is needed.

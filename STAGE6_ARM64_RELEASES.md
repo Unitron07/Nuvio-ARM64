@@ -17,9 +17,11 @@ candidate preparation. Re-running identical data creates no duplicate issue.
 The initial scan records historical releases as well; this is an intentional
 bootstrap audit, not a request to build all of them. Candidate issues link sync
 proposals and state whether the release commit is in main. If not, the owner
-must dispatch sync or review a merge of that exact tag (release lineage can
-differ from Dev). Automatic tag-specific sync creation is deferred; issues give
-an explicit manual integration step. No build starts from monitoring alone.
+receives an automatically dispatched exact-tag sync proposal (release lineage can
+differ from Dev). A persisted dispatch receipt suppresses repeated requests;
+conflicts use the same diagnostic-issue path as Dev synchronization. Candidate
+issues link the exact source branch search. Closed candidate records do not
+request new syncs. No build starts from monitoring alone.
 
 ## Version allocation
 

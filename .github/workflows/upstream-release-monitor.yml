@@ -10,6 +10,7 @@ on:
 permissions:
   contents: read
   issues: write
+  actions: write
 concurrency:
   group: stage6-maintenance
   cancel-in-progress: false

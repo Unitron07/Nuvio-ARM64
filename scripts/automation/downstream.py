@@ -98,10 +98,13 @@ def upsert_issue(api, repo, marker, title, body):
     found = next((i for i in issues if not i.get("pull_request") and marker in (i.get("body") or "")), None)
     payload = {"title": title, "body": marker + "\n" + body}
     if found:
+        # Preserve successful dispatch receipts across later ancestry/body refreshes.
+        for receipt in re.findall(r"<!-- sync-dispatched:[0-9a-f]{40} -->", found.get("body") or ""):
+            payload["body"] += "\n" + receipt
         # Keep closed records closed. Immutable candidate identities avoid repeated notifications.
         if found["body"] != payload["body"]:
             api.request("PATCH", f"repos/{repo}/issues/{found['number']}", payload)
-        return found
+        return found | {"body": payload["body"]}
     return api.request("POST", f"repos/{repo}/issues", payload)
 
 
@@ -112,11 +115,17 @@ def ancestry(older, newer, cwd=None):
     return result.returncode == 0
 
 
-def sync(api, repo, upstream, branch):
+def sync(api, repo, upstream, branch, tag=""):
     validate_repo(upstream)
-    git("check-ref-format", "--branch", branch)
+    if tag:
+        version(tag, 1, 1)
+        git("check-ref-format", "refs/tags/" + tag)
+    else:
+        git("check-ref-format", "--branch", branch)
     git("fetch", "--no-tags", "origin", "main")
-    git("fetch", "--no-tags", f"https://github.com/{upstream}.git", f"refs/heads/{branch}")
+    git("fetch", "--no-tags", f"https://github.com/{upstream}.git", f"refs/tags/{tag}" if tag else f"refs/heads/{branch}")
+    if tag:
+        branch = f"tag {tag}"
     candidate = git("rev-parse", "FETCH_HEAD^{commit}")
     base = git("rev-parse", "origin/main")
     previous = git("merge-base", base, candidate)
@@ -202,7 +211,8 @@ def monitor(api, repo, upstream, tag):
         body = (f"Upstream release: {release['html_url']}\n\n```json\n{json.dumps(identity, indent=2)}\n```\n\n"
                 f"Source ancestor of downstream `{base}`: **{integrated}**.\n\n"
                 f"Sync proposals: https://github.com/{repo}/pulls?q=is%3Apr+label%3Aupstream-sync\n"
-                "If unintegrated, dispatch upstream-sync on the appropriate branch, or review a merge of this exact tag. "
+                f"Exact-source sync proposal: https://github.com/{repo}/pulls?q=is%3Apr+head%3Aautomation%2Fupstream-{source}\n"
+                "Unintegrated sources request a sync proposal for this exact release tag, once per source. "
                 "A Dev merge alone is not proof that a release on another lineage is integrated.\n\n"
                 "Owner must approve/integrate the source, allocate revision and monotonic MSI sequence, then dispatch "
                 "windows-arm64-release from main. Alpha/beta/rc are prereleases even if GitHub labels them stable. "
@@ -211,6 +221,13 @@ def monitor(api, repo, upstream, tag):
                 "Surface install/upgrade/uninstall and profile preservation, signing/trust decision. "
                 "Deleted/replaced releases do not delete this audit record; changed tags create a new identity.\n")
         issue = upsert_issue(api, repo, marker, f"ARM64 candidate: {release['tag_name']} ({identity['key']})", body)
+        receipt = f"<!-- sync-dispatched:{source} -->"
+        if not integrated and issue.get("state") != "closed" and receipt not in (issue.get("body") or ""):
+            api.request("POST", f"repos/{repo}/actions/workflows/upstream-sync.yml/dispatches",
+                        {"ref": "main", "inputs": {"upstream_repository": upstream,
+                                                   "upstream_branch": "Dev", "upstream_tag": release["tag_name"]}})
+            api.request("PATCH", f"repos/{repo}/issues/{issue['number']}",
+                        {"body": issue["body"] + "\n" + receipt})
         summary(issue["html_url"])
 
 
@@ -235,7 +252,7 @@ def main():
         # Label is idempotent and never executes a fetched script.
         if api.request("GET", f"repos/{repo}/labels/upstream-sync", missing=True) is None:
             api.request("POST", f"repos/{repo}/labels", {"name": "upstream-sync", "color": "0366d6"})
-        sync(api, repo, args.upstream, args.branch)
+        sync(api, repo, args.upstream, args.branch, args.tag)
     else:
         monitor(api, repo, args.upstream, args.tag)
 

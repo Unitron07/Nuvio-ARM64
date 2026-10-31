@@ -147,14 +147,35 @@ class SyncTests(unittest.TestCase):
 class MonitorTests(unittest.TestCase):
     @patch.object(d, "git", return_value=SHA)
     @patch.object(d, "ancestry", return_value=False)
+    def test_processed_release_does_not_repeat_sync_dispatch(self, ancestor, git):
+        api = Mock()
+        api.pages.return_value = [RELEASE]
+        with patch.object(d, "upsert_issue", return_value={"number": 9, "html_url": "candidate",
+                    "body": f"<!-- sync-dispatched:{SHA} -->"}):
+            d.monitor(api, "test/repo", "up/repo", "")
+        api.request.assert_not_called()
+
+    @patch.object(d, "git", return_value=SHA)
+    @patch.object(d, "ancestry", return_value=True)
+    def test_integrated_release_never_requests_sync(self, ancestor, git):
+        api = Mock()
+        api.pages.return_value = [RELEASE]
+        with patch.object(d, "upsert_issue", return_value={"number": 9, "body": "candidate", "html_url": "candidate"}):
+            d.monitor(api, "test/repo", "up/repo", "")
+        api.request.assert_not_called()
+
+    @patch.object(d, "git", return_value=SHA)
+    @patch.object(d, "ancestry", return_value=False)
     def test_unintegrated_stable_and_prerelease_only_record_candidates(self, ancestor, git):
         for release in [RELEASE, RELEASE | {"prerelease": True, "tag_name": "1.0.0-beta.1"}]:
             api = Mock()
             api.pages.return_value = [release]
-            with patch.object(d, "upsert_issue", return_value={"html_url": "candidate"}) as issue:
+            with patch.object(d, "upsert_issue", return_value={"number": 9, "body": "candidate", "html_url": "candidate"}) as issue:
                 d.monitor(api, "test/repo", "up/repo", "")
             self.assertIn("**False**", issue.call_args.args[-1])
-            api.request.assert_not_called()  # no automatic packaging or publishing
+            dispatch = next(c for c in api.request.call_args_list if c.args[0] == "POST")
+            self.assertIn("upstream-sync.yml/dispatches", dispatch.args[1])
+            self.assertEqual(dispatch.args[2]["inputs"]["upstream_tag"], release["tag_name"])
 
     def test_missing_tag_or_api_failure_does_not_create_candidate(self):
         api = Mock()
