@@ -15,6 +15,7 @@ $cfg=Get-Content "$image/app/Nuvio-ARM64.cfg" -Raw
 if ($cfg -notmatch 'com.nuvio.app.MainKt') { throw 'Unexpected application entry point.' }
 $destination=Join-Path $pwd 'build/stage6-installer'
 New-Item -ItemType Directory -Force $destination | Out-Null
+if (Get-ChildItem -LiteralPath $destination -Force) { throw 'Use an empty installer output directory; never reuse a previous candidate payload.' }
 # Use the already audited app-image. Rebuilding via packageMsi would reintroduce
 # foreign DLL resources removed by the image audit. WiX must be installed on PATH.
 & "$env:JAVA_HOME/bin/jpackage.exe" --type msi --app-image $image --dest $destination `
@@ -56,6 +57,6 @@ Copy-Item build/windows-media-arm64/notices "$destination/notices" -Recurse
 @('INTERNAL DEVELOPMENT CANDIDATE. UNSIGNED. DO NOT REDISTRIBUTE.',
   "Source=$source", 'Licensing/corresponding source, credentials, physical install/upgrade and signing gates remain open.') |
   Set-Content "$destination/STATUS.txt"
-Get-ChildItem -LiteralPath $destination -Recurse -File | Sort-Object FullName | ForEach-Object {
+Get-ChildItem -LiteralPath $destination -Recurse -File | Where-Object Name -ne 'SHA256SUMS.txt' | Sort-Object FullName | ForEach-Object {
     "$( (Get-FileHash -LiteralPath $_.FullName -Algorithm SHA256).Hash.ToLowerInvariant() )  $($_.FullName.Substring($destination.Length+1).Replace('\','/'))"
 } | Set-Content "$destination/SHA256SUMS.txt"

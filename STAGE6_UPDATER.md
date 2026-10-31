@@ -30,8 +30,8 @@ results use the existing no-update handling; network/API errors use existing
 failure feedback. Ignored version and selected channel are stored in a separate
 `nuvio_arm64_updater` settings store, without migrating account/profile data.
 Existing controller channel-switch cancellation, state reset and ignored-tag
-reset remain in place. Dismissed banners can reappear on a later check; explicit
-ignore stores the tag, and forced manual checks may show an ignored update.
+reset remain in place. Dismissing an informational ARM64 banner stores the ignored tag, so it does not
+repeat automatically. Forced manual checks may show an ignored update.
 
 `ForkArm64Updates.select()` accepts only an exact name bound to a parsed fork tag:
 `Nuvio-ARM64-Windows-arm64-<version>.msi`. It requires a nonzero size, GitHub API

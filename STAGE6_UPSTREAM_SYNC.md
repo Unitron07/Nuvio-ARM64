@@ -97,3 +97,12 @@ its verified source URL peerless2012/libass-android and the second orphan
 and mobile dependencies are not initialized. This permits checkout auth cleanup
 without retaining credentials. Stage 6 Windows actions are pinned to verified
 checkout/setup-java/upload-artifact commit SHAs.
+
+## Current upstream merge rehearsal
+
+An isolated merge of Dev `3e876f699e59e38b66ccc738331fa8071cbf29cc` into Stage 6
+`8d262384` conflicted in `composeApp/src/desktopMain/resources/player-ui/controls.css`.
+The merge was aborted and the temporary worktree removed. No integration commit,
+main change, or upstream preference resolution was made. Review Stage 4 touch
+controls when resolving this conflict; clean merges in other files still need
+the full regression suite.

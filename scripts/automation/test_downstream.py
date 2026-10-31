@@ -107,6 +107,14 @@ class SyncTests(unittest.TestCase):
         self.api.request.assert_not_called()
 
     @patch.object(d, "ancestry", return_value=False)
+    def test_duplicate_run_does_not_dispatch_validation_again(self, ancestor):
+        self.api.pages.side_effect = [[{"state": "open", "draft": True, "html_url": "pr",
+                                       "body": f"<!-- validation-dispatched:{SHA} -->", "head": {"sha": SHA}}], []]
+        with patch.object(d, "git", side_effect=self.fake_git):
+            d.sync(self.api, "test/repo", "up/repo", "Dev")
+        self.api.request.assert_not_called()
+
+    @patch.object(d, "ancestry", return_value=False)
     def test_new_commits_merge_without_rewriting_history(self, ancestor):
         with patch.object(d, "git", side_effect=self.fake_git) as git, \
              patch.object(d.subprocess, "run", return_value=Mock(returncode=0)):

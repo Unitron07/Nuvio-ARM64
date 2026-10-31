@@ -127,7 +127,10 @@ fun AppUpdaterHost(
                     },
                     onInstall = controller::installDownloadedUpdate,
                     onShowReleaseNotes = { showReleaseNotes = true },
-                    onDismiss = controller::dismissDialog,
+                    onDismiss = {
+                        if (availableUpdate.informationalOnly) controller.ignoreThisVersion()
+                        else controller.dismissDialog()
+                    },
                 )
             }
         }
