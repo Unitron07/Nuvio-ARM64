@@ -168,7 +168,7 @@ def sync(api, repo, upstream, branch):
         finally:
             git("worktree", "remove", "--force", str(work))
         existing = api.request("POST", f"repos/{repo}/pulls", {
-            "title": f"Upstream Sync: NuvioDesktop {branch} â€” {datetime.date.today()}",
+            "title": f"Upstream Sync: NuvioDesktop {branch} — {datetime.date.today()}",
             "head": name, "base": "main", "draft": True, "body": body + "\nMerge conflict status: clean at creation.\n"})
         api.request("POST", f"repos/{repo}/issues/{existing['number']}/labels", {"labels": ["upstream-sync"]})
     # Existing bot branches are immutable. Dispatch exact PR head through a trusted

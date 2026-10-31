@@ -87,3 +87,13 @@ capacity must be verified after integration. The scheduled workflow never
 executes a candidate application's code with write tokens. Existing trusted
 main workflow definitions orchestrate read-only builds of untrusted candidate
 code. Review workflow changes in each sync PR before integration.
+
+## CI checkout correction
+
+Credential-free checkout exposed an inherited orphan gitlink: libass-android
+`c10b71ab8b4d90796d4a795f775d337c29198ad0` had no .gitmodules mapping. Restored
+its verified source URL peerless2012/libass-android and the second orphan
+`vendor/quickjs-kt` mapping to dokar3/quickjs-kt. Neither gitlink commit is changed,
+and mobile dependencies are not initialized. This permits checkout auth cleanup
+without retaining credentials. Stage 6 Windows actions are pinned to verified
+checkout/setup-java/upload-artifact commit SHAs.

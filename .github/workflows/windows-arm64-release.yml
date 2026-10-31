@@ -21,7 +21,7 @@ jobs:
       version: ${{ steps.candidate.outputs.version }}
       package_version: ${{ steps.candidate.outputs.package_version }}
     steps:
-      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
         with:
           fetch-depth: 0
           persist-credentials: false
@@ -30,7 +30,7 @@ jobs:
           GH_TOKEN: ${{ github.token }}
           CANDIDATE_ID: ${{ inputs.candidate_id }}
         run: python scripts/automation/prepare_candidate.py "$CANDIDATE_ID"
-      - uses: actions/upload-artifact@v6
+      - uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6
         with:
           name: arm64-candidate-metadata
           path: candidate.json
