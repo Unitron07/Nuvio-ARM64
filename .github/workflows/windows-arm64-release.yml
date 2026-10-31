@@ -1,4 +1,5 @@
 name: Windows ARM64 approved internal candidate
+run-name: ARM64 candidate ${{ inputs.candidate_id }}
 on:
   workflow_dispatch:
     inputs:
@@ -8,6 +9,7 @@ on:
         type: string
 permissions:
   contents: read
+  actions: read
 concurrency:
   group: arm64-release-candidate
   cancel-in-progress: false
@@ -20,6 +22,9 @@ jobs:
       source: ${{ steps.candidate.outputs.downstream_sha }}
       version: ${{ steps.candidate.outputs.version }}
       package_version: ${{ steps.candidate.outputs.package_version }}
+      delivery_recipient: ${{ steps.candidate.outputs.delivery_recipient }}
+      upstream_tag: ${{ steps.candidate.outputs.upstream_tag }}
+      upstream_sha: ${{ steps.candidate.outputs.upstream_sha }}
     steps:
       - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
         with:
@@ -54,6 +59,9 @@ jobs:
       build_msi: true
       version_name: ${{ needs.prepare.outputs.version }}
       package_version: ${{ needs.prepare.outputs.package_version }}
+      delivery_recipient: ${{ needs.prepare.outputs.delivery_recipient }}
+      upstream_tag: ${{ needs.prepare.outputs.upstream_tag }}
+      upstream_sha: ${{ needs.prepare.outputs.upstream_sha }}
   draft:
     needs: [prepare, package]
     runs-on: ubuntu-latest
