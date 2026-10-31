@@ -66,3 +66,11 @@ stable and preview policy, numeric revisions, invalid/older/equal versions and
 repository list selection. Existing controller/repository/network behavior tests
 remain applicable; complete fault-injected HTTP/controller tests for ARM64 are
 still follow-up work. UI text uses a new resource with normal English fallback.
+
+## Windows regression-suite portability
+
+Adding all desktop updater tests to ARM64/x64 Windows CI exposed three inherited
+Linux command-construction tests with hard-coded Unix absolute-path expectations.
+Their fixture expectations now use the host's File.absolutePath, matching the
+existing command builder; Linux product behavior is unchanged. The suite remains
+included on both Windows architectures rather than excluding those tests.
