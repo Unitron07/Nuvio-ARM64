@@ -102,7 +102,8 @@ attachment/publication through a protected approval environment.
 ARM64 uses display/launcher/package/menu name `Nuvio-ARM64`, vendor
 `Nuvio-ARM64 contributors`, per-user install, and upgrade UUID
 `febc83be-f241-4a78-8f6c-10af5e358acc`. It is distinct from official Nuvio's UUID
-and install name; MSI ProductCodes are generated per package. Validate actual
+and install name. Windows icon customization uses only fork-named shortcuts and
+a separate fork icon directory, preserving official Nuvio shortcuts. MSI ProductCodes are generated per package. Validate actual
 registry, shortcuts, install directory and uninstall behavior on hardware.
 Production `%APPDATA%/Nuvio`, cache and SDK authentication identity are preserved;
 there is NO silent profile migration. The fork and official app may share data:
