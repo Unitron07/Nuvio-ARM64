@@ -28,6 +28,7 @@ data class AppUpdate(
     val assetName: String,
     val assetUrl: String,
     val assetSizeBytes: Long?,
+    val informationalOnly: Boolean = false,
 )
 
 data class AppUpdaterUiState(
@@ -111,7 +112,9 @@ class AppUpdaterController internal constructor(
             if (channel != preferences.channel.value) return@launch
 
             result.onSuccess { update ->
-                val remoteNewer = if (channel == UpdateChannel.ALL_RELEASES) {
+                val remoteNewer = if (AppUpdaterPlatform.releaseSource.forkArm64) {
+                    ForkArm64Version.isRemoteNewer(update.tag, AppUpdaterPlatform.currentVersionName)
+                } else if (channel == UpdateChannel.ALL_RELEASES) {
                     VersionUtils.isRemoteNewerLegacy(update.tag, AppUpdaterPlatform.currentVersionName)
                 } else {
                     VersionUtils.isRemoteNewer(update.tag, AppUpdaterPlatform.currentVersionName)
@@ -194,6 +197,7 @@ class AppUpdaterController internal constructor(
     fun downloadUpdate() {
         if (_uiState.value.isDownloading) return
         val update = _uiState.value.update ?: return
+        if (update.informationalOnly) return
         if (_uiState.value.isDebugTest) {
             runDebugDownloadTest()
             return

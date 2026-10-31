@@ -1,0 +1,38 @@
+name: Upstream synchronization proposals
+on:
+  schedule:
+    - cron: '17 */6 * * *'
+  workflow_dispatch:
+    inputs:
+      upstream_repository:
+        description: Official source repository
+        default: NuvioMedia/NuvioDesktop
+        type: string
+      upstream_branch:
+        description: Development branch
+        default: Dev
+        type: string
+permissions:
+  contents: write
+  pull-requests: write
+  issues: write
+  actions: write
+concurrency:
+  group: stage6-maintenance
+  cancel-in-progress: false
+jobs:
+  propose:
+    if: github.repository == 'Unitron07/Nuvio-ARM64' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Run trusted downstream automation
+        env:
+          GH_TOKEN: ${{ github.token }}
+          UPSTREAM: ${{ inputs.upstream_repository || 'NuvioMedia/NuvioDesktop' }}
+          UPSTREAM_BRANCH: ${{ inputs.upstream_branch || 'Dev' }}
+        run: python scripts/automation/downstream.py sync --upstream "$UPSTREAM" --branch "$UPSTREAM_BRANCH"

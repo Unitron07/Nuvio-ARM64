@@ -27,6 +27,8 @@ import androidx.compose.material.icons.rounded.CheckCircle
 import androidx.compose.material.icons.rounded.Close
 import androidx.compose.material.icons.rounded.CloudDownload
 import androidx.compose.material.icons.rounded.Info
+import androidx.compose.ui.platform.LocalUriHandler
+import nuvio.composeapp.generated.resources.updates_view_release
 import androidx.compose.material3.Button
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.HorizontalDivider
@@ -88,6 +90,7 @@ fun AppUpdaterHost(
         return
     }
 
+    val uriHandler = LocalUriHandler.current
     val state by controller.uiState.collectAsStateWithLifecycle()
     var showReleaseNotes by rememberSaveable { mutableStateOf(false) }
 
@@ -117,7 +120,11 @@ fun AppUpdaterHost(
                 AppUpdateBanner(
                     state = state,
                     update = availableUpdate,
-                    onDownload = controller::downloadUpdate,
+                    onDownload = {
+                        if (availableUpdate.informationalOnly) {
+                            availableUpdate.releaseUrl?.let { uriHandler.openUri(it) }
+                        } else controller.downloadUpdate()
+                    },
                     onInstall = controller::installDownloadedUpdate,
                     onShowReleaseNotes = { showReleaseNotes = true },
                     onDismiss = controller::dismissDialog,
@@ -196,7 +203,7 @@ private fun AppUpdateBanner(
     val updateLabel = listOfNotNull(
         update.tag,
         update.assetSizeBytes?.let(::formatFileSize),
-    ).joinToString(separator = " • ")
+    ).joinToString(separator = " â€¢ ")
 
     Box(
         modifier = Modifier
@@ -278,7 +285,9 @@ private fun AppUpdateBanner(
                     contentPadding = PaddingValues(horizontal = 12.dp, vertical = 8.dp),
                 ) {
                     Text(
-                        if (state.downloadedUpdatePath != null) {
+                        if (update.informationalOnly) {
+                            stringResource(Res.string.updates_view_release)
+                        } else if (state.downloadedUpdatePath != null) {
                             stringResource(Res.string.action_install)
                         } else if (state.errorMessage != null) {
                             stringResource(Res.string.action_retry)

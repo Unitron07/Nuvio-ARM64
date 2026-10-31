@@ -1,0 +1,19 @@
+name: Stage 6 automation tests
+on:
+  pull_request:
+    paths:
+      - scripts/automation/**
+      - scripts/windows/stage6/**
+      - .github/workflows/**
+      - STAGE6*.md
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  automation:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          persist-credentials: false
+      - run: python -m unittest discover -s scripts/automation -p 'test_*.py' -v

@@ -3,10 +3,17 @@ on:
   pull_request:
     paths:
       - STAGE4*.md
+      - STAGE6*.md
+      - scripts/automation/**
       - STAGE5*.md
       - scripts/windows/**
       - .github/workflows/windows-quickjs.yml
   workflow_dispatch:
+  workflow_call:
+    inputs:
+      source_ref:
+        type: string
+        default: ''
 permissions:
   contents: read
 jobs:
@@ -27,6 +34,9 @@ jobs:
     timeout-minutes: 25
     steps:
       - uses: actions/checkout@v6
+        with:
+          ref: ${{ inputs.source_ref || github.event.pull_request.head.sha || github.sha }}
+          persist-credentials: false
       - uses: actions/setup-java@v5
         with:
           distribution: microsoft
@@ -52,7 +62,7 @@ jobs:
           $output = 'build/windows-quickjs/${{ matrix.arch }}'
           if (Test-Path $output) {
             @('NATIVE_BUILD=${{ steps.native.outcome }}', 'JVM_SMOKE=${{ steps.smoke.outcome }}',
-              'SOURCE_COMMIT=${{ github.event.pull_request.head.sha || github.sha }}',
+              'SOURCE_COMMIT=${{ inputs.source_ref || github.event.pull_request.head.sha || github.sha }}',
               'This is a JNI dependency bundle, not a Nuvio application. Failed smoke results mean diagnostic use only.') |
               Set-Content "$output/VALIDATION_STATUS.txt"
           }

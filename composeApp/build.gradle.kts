@@ -458,13 +458,15 @@ val desktopVersionProps = Properties().apply {
         desktopVersionConfigFile.inputStream().use { load(it) }
     }
 }
+val isForkWindowsArm64 = System.getProperty("os.name").contains("win", ignoreCase = true) &&
+    System.getProperty("os.arch").lowercase() in listOf("aarch64", "arm64")
 val desktopReleaseVersionName = (
     providers.gradleProperty("nuvio.desktop.versionName").orNull
         ?: System.getenv("NUVIO_DESKTOP_VERSION_NAME")
         ?: supabaseProps.getProperty("NUVIO_DESKTOP_VERSION_NAME")
         ?: desktopVersionProps.getProperty("VERSION_NAME")
         ?: "0.1.0"
-    ).trim()
+    ).trim().let { if (isForkWindowsArm64 && !it.contains("+arm64.")) "$it+arm64.0" else it }
 require(desktopReleaseVersionName.isNotBlank()) {
     "Desktop version name must not be blank."
 }
@@ -477,8 +479,15 @@ val desktopReleaseVersionCode = (
     ?.takeIf { it.isNotBlank() }
     ?.toIntOrNull()
     ?: 1
-val desktopReleasePackageVersion = jpackageCompatibleVersion(desktopReleaseVersionName)
-val windowsMsiUpgradeUuid = "395990ee-9b8a-3548-922c-e7a23a495b8d"
+val desktopReleasePackageVersion = if (isForkWindowsArm64) {
+    val numeric = providers.gradleProperty("nuvio.arm64.packageVersion").orNull ?: "1.0.0"
+    require(numeric.matches(Regex("1\\.0\\.(0|[1-9][0-9]{0,4})")) && numeric.substringAfterLast('.').toInt() <= 65535) {
+        "ARM64 MSI version must be 1.0.<owner allocated sequence 0..65535>."
+    }
+    numeric
+} else jpackageCompatibleVersion(desktopReleaseVersionName)
+val windowsMsiUpgradeUuid = if (isForkWindowsArm64) "febc83be-f241-4a78-8f6c-10af5e358acc"
+    else "395990ee-9b8a-3548-922c-e7a23a495b8d"
 val iosDistribution = (
     providers.gradleProperty("nuvio.ios.distribution").orNull
         ?: System.getenv("NUVIO_IOS_DISTRIBUTION")
@@ -1387,9 +1396,9 @@ compose.desktop {
 
         nativeDistributions {
             targetFormats(TargetFormat.Dmg, TargetFormat.Msi, TargetFormat.Deb, TargetFormat.Rpm, TargetFormat.AppImage)
-            packageName = "Nuvio"
+            packageName = if (isForkWindowsArm64) "Nuvio-ARM64" else "Nuvio"
             packageVersion = desktopReleasePackageVersion
-            vendor = "Nuvio Media"
+            vendor = if (isForkWindowsArm64) "Nuvio-ARM64 contributors" else "Nuvio Media"
             if (isMacHost) {
                 appResourcesRootDir.set(macosPlayerAppResourcesRoot)
             }
@@ -1443,7 +1452,9 @@ compose.desktop {
                 upgradeUuid = windowsMsiUpgradeUuid
                 shortcut = true
                 menu = true
-                menuGroup = "Nuvio"
+                menuGroup = if (isForkWindowsArm64) "Nuvio-ARM64" else "Nuvio"
+                perUserInstall = isForkWindowsArm64
+                dirChooser = isForkWindowsArm64
             }
             linux {
                 iconFile.set(project.file("src/desktopMain/resources/icons/nuvio-app-icon-transparent.png"))
@@ -1502,8 +1513,8 @@ fun publishWindowsMsiOutput(release: Boolean) {
 
     val distributionName = if (release) "main-release" else "main"
     val outputDir = layout.buildDirectory.dir("compose/binaries/$distributionName/msi").get().asFile
-    val finalMsi = outputDir.resolve("Nuvio-Windows-$windowsPlayerBridgeArch-$desktopReleaseVersionName.msi")
-    val defaultMsi = outputDir.resolve("Nuvio-$desktopReleasePackageVersion.msi")
+    val finalMsi = outputDir.resolve("${if (isForkWindowsArm64) "Nuvio-ARM64" else "Nuvio"}-Windows-$windowsPlayerBridgeArch-$desktopReleaseVersionName.msi")
+    val defaultMsi = outputDir.resolve("${if (isForkWindowsArm64) "Nuvio-ARM64" else "Nuvio"}-$desktopReleasePackageVersion.msi")
     val sourceMsi = defaultMsi.takeIf { it.exists() }
         ?: finalMsi.takeIf { it.exists() }
         ?: error("Expected Windows MSI output in ${outputDir.absolutePath}")

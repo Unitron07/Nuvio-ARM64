@@ -1,0 +1,105 @@
+name: Windows ARM64 approved internal candidate
+on:
+  workflow_dispatch:
+    inputs:
+      candidate_id:
+        description: Owner-reviewed key in .github/arm64-candidates.json on main
+        required: true
+        type: string
+permissions:
+  contents: read
+concurrency:
+  group: arm64-release-candidate
+  cancel-in-progress: false
+jobs:
+  prepare:
+    if: github.repository == 'Unitron07/Nuvio-ARM64' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    environment: arm64-internal-candidate
+    outputs:
+      source: ${{ steps.candidate.outputs.downstream_sha }}
+      version: ${{ steps.candidate.outputs.version }}
+      package_version: ${{ steps.candidate.outputs.package_version }}
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - id: candidate
+        env:
+          GH_TOKEN: ${{ github.token }}
+          CANDIDATE_ID: ${{ inputs.candidate_id }}
+        run: python scripts/automation/prepare_candidate.py "$CANDIDATE_ID"
+      - uses: actions/upload-artifact@v6
+        with:
+          name: arm64-candidate-metadata
+          path: candidate.json
+          if-no-files-found: error
+          retention-days: 7
+  integration:
+    needs: prepare
+    uses: ./.github/workflows/windows-stage3-integration.yml
+    with:
+      source_ref: ${{ needs.prepare.outputs.source }}
+  quickjs:
+    needs: prepare
+    uses: ./.github/workflows/windows-quickjs.yml
+    with:
+      source_ref: ${{ needs.prepare.outputs.source }}
+  package:
+    needs: [prepare, integration, quickjs]
+    uses: ./.github/workflows/windows-arm64-app.yml
+    with:
+      source_ref: ${{ needs.prepare.outputs.source }}
+      build_msi: true
+      version_name: ${{ needs.prepare.outputs.version }}
+      package_version: ${{ needs.prepare.outputs.package_version }}
+  draft:
+    needs: [prepare, package]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      # No application code executes in the write-token job. Only metadata is
+      # attached while redistribution gates are open. No publication code exists.
+      - name: Create metadata-only draft record
+        env:
+          GH_TOKEN: ${{ github.token }}
+          VERSION: ${{ needs.prepare.outputs.version }}
+          SOURCE: ${{ needs.prepare.outputs.source }}
+          CANDIDATE_ID: ${{ inputs.candidate_id }}
+        run: |
+          python - <<'PY'
+          import json, os, urllib.request
+          repo = os.environ['GITHUB_REPOSITORY']
+          headers = {'Authorization': 'Bearer ' + os.environ['GH_TOKEN'], 'Accept': 'application/vnd.github+json'}
+          root = 'https://api.github.com/repos/' + repo + '/releases'
+          releases = []
+          for page in range(1, 1001):
+              with urllib.request.urlopen(urllib.request.Request(root + f'?per_page=100&page={page}', headers=headers), timeout=60) as response:
+                  items = json.load(response)
+              releases.extend(items)
+              if len(items) < 100: break
+          else: raise RuntimeError('Release pagination exceeded')
+          tag = os.environ['VERSION']
+          existing = next((r for r in releases if r['tag_name'] == tag), None)
+          if existing:
+              if not existing['draft']: raise RuntimeError('Version already publicly released; refusing modification')
+              print('Existing draft retained: ' + existing['html_url'])
+          else:
+              body = ('INTERNAL CANDIDATE — NOT APPROVED FOR DISTRIBUTION.\n\n'
+                      + 'Candidate ledger key: `' + os.environ['CANDIDATE_ID'] + '`\nSource: `' + os.environ['SOURCE'] + '`\n\n'
+                      + 'Native ARM64 build includes QuickJS, libmpv, player bridge and WebView2. '
+                      + 'Construction does not establish Surface installer/upgrade or playback acceptance. '
+                      + 'P2P remains unsupported. Automatic installation remains disabled.\n\n'
+                      + 'No installers attached pending native licensing/corresponding source, credential storage, '
+                      + 'physical installer/profile preservation and signing/trust decisions. '
+                      + 'See STAGE6_ARM64_RELEASES.md and matching workflow metadata/artifacts. '
+                      + 'Based-on release provenance is recorded in .github/arm64-candidates.json; '
+                      + 'review the complete downstream source diff before release. Never publish this draft automatically.')
+              payload = {'tag_name': tag, 'target_commitish': os.environ['SOURCE'], 'name': tag + ' — internal candidate',
+                         'body': body, 'draft': True, 'prerelease': '-' in tag}
+              with urllib.request.urlopen(urllib.request.Request(root, data=json.dumps(payload).encode(), headers=headers, method='POST'), timeout=60) as response:
+                  print(json.load(response)['html_url'])
+          PY
+          echo 'Metadata-only draft. No public release or installer distribution is authorized.' >> "$GITHUB_STEP_SUMMARY"

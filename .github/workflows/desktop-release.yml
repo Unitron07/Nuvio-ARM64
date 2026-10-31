@@ -38,6 +38,7 @@ concurrency:
 
 jobs:
   metadata:
+    if: github.repository == 'NuvioMedia/NuvioDesktop'
     name: ${{ inputs.mode }} ${{ inputs.target }} desktop release
     runs-on: ubuntu-latest
     outputs:

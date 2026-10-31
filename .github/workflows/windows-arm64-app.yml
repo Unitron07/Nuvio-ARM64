@@ -3,6 +3,8 @@ on:
   pull_request:
     paths:
       - STAGE4*.md
+      - STAGE6*.md
+      - scripts/automation/**
       - STAGE5*.md
       - scripts/windows/**
       - composeApp/build.gradle.kts
@@ -11,6 +13,20 @@ on:
       - composeApp/src/fullCommonMain/**
       - .github/workflows/windows-arm64-app.yml
   workflow_dispatch:
+  workflow_call:
+    inputs:
+      source_ref:
+        type: string
+        default: ''
+      build_msi:
+        type: boolean
+        default: false
+      version_name:
+        type: string
+        default: ''
+      package_version:
+        type: string
+        default: ''
 permissions:
   contents: read
 jobs:
@@ -19,6 +35,9 @@ jobs:
     timeout-minutes: 45
     steps:
       - uses: actions/checkout@v6
+        with:
+          ref: ${{ inputs.source_ref || github.event.pull_request.head.sha || github.sha }}
+          persist-credentials: false
       - name: Verify player shortcut key variants
         run: |
           node scripts/windows/test-player-shortcuts.mjs
@@ -102,11 +121,22 @@ jobs:
           path: composeApp/build/native/windows/arm64/player_bridge.dll
           if-no-files-found: error
           retention-days: 7
+      - name: Configure approved candidate version
+        if: inputs.build_msi
+        shell: pwsh
+        env:
+          VERSION_NAME: ${{ inputs.version_name }}
+          PACKAGE_VERSION: ${{ inputs.package_version }}
+        run: |
+          if ($env:VERSION_NAME -notmatch '^\d+\.\d+\.\d+(?:-[0-9A-Za-z.-]+)?\+arm64\.[1-9][0-9]*$') { throw 'Invalid fork version.' }
+          if ($env:PACKAGE_VERSION -notmatch '^1\.0\.[1-9][0-9]{0,4}$') { throw 'Invalid package version.' }
+          Add-Content gradle.properties "`nnuvio.desktop.versionName=$env:VERSION_NAME"
+          Add-Content gradle.properties "nuvio.arm64.packageVersion=$env:PACKAGE_VERSION"
       - name: Create development app image
         env:
-          NUVIO_SUPABASE_URL: ${{ vars.NUVIO_SUPABASE_URL || secrets.NUVIO_SUPABASE_URL }}
-          NUVIO_SUPABASE_ANON_KEY: ${{ vars.NUVIO_SUPABASE_ANON_KEY || secrets.NUVIO_SUPABASE_ANON_KEY }}
-          NUVIO_SUPABASE_FALLBACK_URL: ${{ vars.NUVIO_SUPABASE_FALLBACK_URL || secrets.NUVIO_SUPABASE_FALLBACK_URL }}
+          NUVIO_SUPABASE_URL: ${{ vars.NUVIO_SUPABASE_URL }}
+          NUVIO_SUPABASE_ANON_KEY: ${{ vars.NUVIO_SUPABASE_ANON_KEY }}
+          NUVIO_SUPABASE_FALLBACK_URL: ${{ vars.NUVIO_SUPABASE_FALLBACK_URL }}
         id: image
         shell: pwsh
         run: |
@@ -156,17 +186,32 @@ jobs:
         run: |
           $image=Get-ChildItem composeApp/build/compose/binaries/main/app -Directory | Select-Object -First 1
           $launcher=Get-ChildItem $image.FullName -File -Filter '*.exe' | Select-Object -First 1
-          [ordered]@{schema='nuvio-stage3-image-v1'; sourceCommit='${{ github.event.pull_request.head.sha || github.sha }}';
+          [ordered]@{schema='nuvio-stage3-image-v1'; sourceCommit='${{ inputs.source_ref || github.event.pull_request.head.sha || github.sha }}';
             nativeTestDataIsolation=$true; typedHttpHeaders=$true;
             launcherSha256=(Get-FileHash -LiteralPath $launcher.FullName -Algorithm SHA256).Hash;
             bridgeSha256=(Get-FileHash composeApp/build/native/windows/arm64/player_bridge.dll -Algorithm SHA256).Hash;
             validation='Build, architecture audit and native prerequisites only; UI/provider acceptance pending.'} |
             ConvertTo-Json | Set-Content (Join-Path $image.FullName 'STAGE3_IMAGE.json')
+      - name: Build internal MSI from the audited image
+        if: inputs.build_msi
+        shell: pwsh
+        env:
+          VERSION_NAME: ${{ inputs.version_name }}
+          PACKAGE_VERSION: ${{ inputs.package_version }}
+        run: |
+          ./scripts/windows/stage6/Build-Installer.ps1 -Version $env:VERSION_NAME -PackageVersion $env:PACKAGE_VERSION
+      - uses: actions/upload-artifact@v6
+        if: inputs.build_msi && success()
+        with:
+          name: windows-arm64-internal-installer
+          path: build/stage6-installer/
+          if-no-files-found: error
+          retention-days: 7
       - name: Record development artifact status
         if: always()
         shell: pwsh
         run: |
-          @('NATIVE_BRIDGE=${{ steps.bridge.outcome }}', 'IMAGE_BUILD=${{ steps.image.outcome }}', 'IMAGE_NATIVE_AUDIT=${{ steps.audit.outcome }}', 'NATIVE_STARTUP=${{ steps.startup.outcome }}', 'SOURCE=${{ github.event.pull_request.head.sha || github.sha }}',
+          @('NATIVE_BRIDGE=${{ steps.bridge.outcome }}', 'IMAGE_BUILD=${{ steps.image.outcome }}', 'IMAGE_NATIVE_AUDIT=${{ steps.audit.outcome }}', 'NATIVE_STARTUP=${{ steps.startup.outcome }}', 'SOURCE=${{ inputs.source_ref || github.event.pull_request.head.sha || github.sha }}',
             'Development evidence only. Runtime launch, playback, licensing and install validation are separate gates.') |
             Set-Content build/ARM64_VALIDATION_STATUS.txt
       - uses: actions/upload-artifact@v6

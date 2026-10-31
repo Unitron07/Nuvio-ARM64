@@ -22,6 +22,7 @@ try {
     if ($LASTEXITCODE -ne 0) { throw 'Scroll metrics analyzer test failed.' }
     & ./gradlew.bat :composeApp:desktopTest `
         --tests 'com.nuvio.app.stage3.*' `
+        --tests 'com.nuvio.app.features.updater.*' `
         --tests 'com.nuvio.app.core.ui.DesktopVerticalDragScrollTest' `
         --tests 'com.nuvio.app.core.ui.StreamListTouchTest' `
         --tests 'com.nuvio.app.core.ui.ScrollDiagnosticsTest' `

@@ -3,6 +3,8 @@ on:
   pull_request:
     paths:
       - STAGE4*.md
+      - STAGE6*.md
+      - scripts/automation/**
       - STAGE5*.md
       - composeApp/src/commonMain/**
       - composeApp/src/commonTest/**
@@ -14,6 +16,11 @@ on:
       - STAGE3_ARM64_VALIDATION.md
       - .github/workflows/windows-stage3-integration.yml
   workflow_dispatch:
+  workflow_call:
+    inputs:
+      source_ref:
+        type: string
+        default: ''
 permissions:
   contents: read
 jobs:
@@ -34,6 +41,9 @@ jobs:
     timeout-minutes: 35
     steps:
       - uses: actions/checkout@v6
+        with:
+          ref: ${{ inputs.source_ref || github.event.pull_request.head.sha || github.sha }}
+          persist-credentials: false
       - uses: actions/setup-java@v5
         with:
           distribution: microsoft
@@ -55,13 +65,13 @@ jobs:
         run: ./scripts/windows/stage3/Pack-OwnerTools.ps1 -OutputDirectory build/stage3-owner-tools
       - name: Package Stage 5 tools from the exact application source
         shell: pwsh
-        run: ./scripts/windows/stage5/Pack-OwnerTools.ps1 -OutputDirectory build/stage5-owner-tools -SourceCommit '${{ github.event.pull_request.head.sha || github.sha }}'
+        run: ./scripts/windows/stage5/Pack-OwnerTools.ps1 -OutputDirectory build/stage5-owner-tools -SourceCommit '${{ inputs.source_ref || github.event.pull_request.head.sha || github.sha }}'
       - name: Record evidence scope
         if: always()
         shell: pwsh
         run: |
           New-Item -ItemType Directory -Force build | Out-Null
-          @('SOURCE=${{ github.event.pull_request.head.sha || github.sha }}', 'ARCH=${{ matrix.osArch }}',
+          @('SOURCE=${{ inputs.source_ref || github.event.pull_request.head.sha || github.sha }}', 'ARCH=${{ matrix.osArch }}',
             'APPLICATION_INTEGRATION=${{ steps.tests.outcome }}',
             'Native QuickJS runs on the matching architecture. Player controller operations use fakes.',
             'Rendered playback, HTTPS, navigation, real provider accounts and hardware decoding require separate owner evidence.') |

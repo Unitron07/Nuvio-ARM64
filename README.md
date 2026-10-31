@@ -1,3 +1,22 @@
+# Nuvio-ARM64 downstream fork
+
+Native Windows ARM64 work for Surface Pro 11 / Snapdragon X, based on
+[Nuvio Desktop](https://github.com/NuvioMedia/NuvioDesktop). Upstream attribution
+and GPLv3 licensing are retained below.
+
+**ARM64 users:** use this fork's validated CI development artifacts and
+[fork releases](https://github.com/Unitron07/Nuvio-ARM64/releases) when approved.
+The upstream Windows MSI is x64 and is not the native ARM64 package. No public
+ARM64 installer is claimed ready. Stage 6 adds review-only upstream automation,
+experimental internal packaging and informational fork update discovery.
+
+See [sync design](STAGE6_UPSTREAM_SYNC.md), [candidate and release gates](STAGE6_ARM64_RELEASES.md),
+[updater policy](STAGE6_UPDATER.md), and [isolated Surface validation](STAGE6_SURFACE_VALIDATION.md).
+Public release and automatic installation remain blocked pending licensing,
+security, signing/trust decisions and physical installer evidence.
+
+---
+
 <div align="center">
 
   <img src="https://nuvio.tv/assets/nuvio-app-logo-wordmark.webp" alt="Nuvio" width="320" />
@@ -20,7 +39,7 @@ Expect breaking changes with every update. Features, settings, stored data, and 
 
 ## Get Nuvio Desktop
 
-Download the latest build from [GitHub Releases](https://github.com/NuvioMedia/NuvioDesktop/releases/latest).
+**Other platforms / official upstream builds:** download from [GitHub Releases](https://github.com/NuvioMedia/NuvioDesktop/releases/latest).
 
 - Windows: MSI installer
 - macOS: DMG installer
