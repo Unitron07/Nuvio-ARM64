@@ -179,7 +179,7 @@ class LinuxUpdateInstallTest {
             currentPid = 4242L,
         )
 
-        assertEquals(listOf("xdg-open", "/tmp/updates/Nuvio.rpm"), command)
+        assertEquals(listOf("xdg-open", File("/tmp/updates/Nuvio.rpm").absolutePath), command)
     }
 
     @Test
@@ -194,10 +194,11 @@ class LinuxUpdateInstallTest {
         assertEquals("sh", command[0])
         assertEquals("-c", command[1])
         val script = command[2]
+        val downloadedPath = File("/tmp/updates/Nuvio.AppImage").absolutePath
         assertTrue(script.contains("kill -0 4242"))
-        assertTrue(script.contains("cp -f -- '/tmp/updates/Nuvio.AppImage' '/home/user/Apps/Nuvio.AppImage'"))
+        assertTrue(script.contains("cp -f -- '$downloadedPath' '/home/user/Apps/Nuvio.AppImage'"))
         assertTrue(script.contains("exec '/home/user/Apps/Nuvio.AppImage'"))
-        assertTrue(script.contains("else xdg-open '/tmp/updates/Nuvio.AppImage'"))
+        assertTrue(script.contains("else xdg-open '$downloadedPath'"))
     }
 
     @Test
@@ -209,7 +210,7 @@ class LinuxUpdateInstallTest {
             currentPid = 4242L,
         )
 
-        assertEquals(listOf("xdg-open", "/tmp/updates/Nuvio.AppImage"), command)
+        assertEquals(listOf("xdg-open", File("/tmp/updates/Nuvio.AppImage").absolutePath), command)
     }
 
     @Test

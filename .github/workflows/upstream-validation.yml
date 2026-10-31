@@ -1,0 +1,42 @@
+name: Validate upstream candidate
+on:
+  workflow_dispatch:
+    inputs:
+      source_sha:
+        description: Immutable synchronization PR head SHA
+        required: true
+        type: string
+permissions:
+  contents: read
+concurrency:
+  group: upstream-validation-${{ inputs.source_sha }}
+  cancel-in-progress: false
+jobs:
+  verify:
+    if: github.repository == 'Unitron07/Nuvio-ARM64' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Require immutable commit input
+        env:
+          SOURCE: ${{ inputs.source_sha }}
+        run: '[[ "$SOURCE" =~ ^[0-9a-f]{40}$ ]]'
+  native:
+    needs: verify
+    uses: ./.github/workflows/windows-native-checks.yml
+    with:
+      source_ref: ${{ inputs.source_sha }}
+  quickjs:
+    needs: verify
+    uses: ./.github/workflows/windows-quickjs.yml
+    with:
+      source_ref: ${{ inputs.source_sha }}
+  integration:
+    needs: verify
+    uses: ./.github/workflows/windows-stage3-integration.yml
+    with:
+      source_ref: ${{ inputs.source_sha }}
+  image:
+    needs: verify
+    uses: ./.github/workflows/windows-arm64-app.yml
+    with:
+      source_ref: ${{ inputs.source_sha }}

@@ -35,9 +35,11 @@ private val desktopUpdaterHttpClient: HttpClient = HttpClient.newBuilder()
 
 actual object AppUpdaterPlatform {
     private val currentOs: DesktopUpdaterOs = DesktopUpdaterOs.current()
-    private val store = DesktopStorage.store(desktopUpdaterPreferencesName)
+    private val forkArm64 = currentOs == DesktopUpdaterOs.WINDOWS &&
+        System.getProperty("os.arch").lowercase(Locale.ROOT) in listOf("aarch64", "arm64")
+    private val store = DesktopStorage.store(if (forkArm64) "nuvio_arm64_updater" else desktopUpdaterPreferencesName)
     actual val isDebugBuild: Boolean = false
-    actual val hasSingleUpdateChannel: Boolean = true
+    actual val hasSingleUpdateChannel: Boolean = !forkArm64
 
     // Linux ships four package formats and the running app is the only place
     // that can tell which one it was installed from, so the format is resolved
@@ -50,9 +52,14 @@ actual object AppUpdaterPlatform {
     // access to /app and the manifest grants no talk-name for the host Flatpak
     // service, so the update belongs to the user's store, not to this dialog.
     actual val isSupported: Boolean
-        get() = currentOs != DesktopUpdaterOs.UNKNOWN && linuxInstallMethod != LinuxInstallMethod.FLATPAK
+        get() = currentOs != DesktopUpdaterOs.UNKNOWN && linuxInstallMethod != LinuxInstallMethod.FLATPAK &&
+            (currentOs != DesktopUpdaterOs.WINDOWS ||
+                System.getProperty("os.arch").lowercase(Locale.ROOT) in listOf("arm64", "aarch64", "x64", "amd64", "x86_64"))
 
-    actual val releaseSource: AppUpdateReleaseSource = AppUpdateReleaseSource(
+    actual val releaseSource: AppUpdateReleaseSource = if (forkArm64) AppUpdateReleaseSource(
+        owner = "Unitron07", repo = "Nuvio-ARM64", includePrereleases = true,
+        userAgent = "Nuvio-ARM64", forkArm64 = true,
+    ) else AppUpdateReleaseSource(
         owner = "NuvioMedia",
         repo = "NuvioDesktop",
         channelBranch = null,
@@ -89,6 +96,7 @@ actual object AppUpdaterPlatform {
         onProgress: (downloadedBytes: Long, totalBytes: Long?) -> Unit,
     ): Result<String> = withContext(Dispatchers.IO) {
         runCatching {
+            check(!forkArm64) { "ARM64 updates are informational until installer and integrity validation is approved. Open the fork release page." }
             clearDir(updatesDir())
             val safeName = assetName.replace(Regex("[^a-zA-Z0-9._-]"), "_")
             val destination = File(updatesDir(), safeName)
@@ -138,11 +146,12 @@ actual object AppUpdaterPlatform {
         }
     }
 
-    actual fun canInstallDownloadedUpdate(): Boolean = true
+    actual fun canInstallDownloadedUpdate(): Boolean = !forkArm64
 
     actual fun openInstallPermissionSettings() = Unit
 
     actual fun installDownloadedUpdate(path: String): Result<Unit> = runCatching {
+        check(!forkArm64) { "Automatic ARM64 installation is disabled pending release safety gates." }
         val updateFile = File(path)
         check(updateFile.exists()) { runBlocking { getString(Res.string.updates_downloaded_file_missing) } }
 

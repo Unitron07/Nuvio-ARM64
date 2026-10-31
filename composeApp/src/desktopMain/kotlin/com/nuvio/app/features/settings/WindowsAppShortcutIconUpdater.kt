@@ -22,7 +22,7 @@ internal object WindowsAppShortcutIconUpdater {
         runCatching {
             val resource = "icons/app-icon-${icon.key}-transparent.ico"
             val localAppData = knownFolder("LocalApplicationData") ?: return@runCatching
-            val iconDirectory = localAppData.resolve("Nuvio/icons")
+            val iconDirectory = localAppData.resolve("${windowsShortcutApplicationName(System.getProperty("os.arch"))}/icons")
             Files.createDirectories(iconDirectory)
             val iconFile = iconDirectory.resolve("app-icon-${icon.key}-transparent.ico")
             Thread.currentThread().contextClassLoader.getResourceAsStream(resource)?.use { input ->
@@ -42,27 +42,12 @@ internal object WindowsAppShortcutIconUpdater {
         }
     }
 
-    private fun shortcutPaths(): Sequence<Path> = sequence {
-        val desktop = knownFolder("Desktop")
-        val programs = knownFolder("Programs")
-        val applicationData = knownFolder("ApplicationData")
-        val commonDesktop = knownFolder("CommonDesktopDirectory")
-        val commonPrograms = knownFolder("CommonPrograms")
-
-        desktop?.let { yield(it.resolve("Nuvio.lnk")) }
-        programs?.let {
-            yield(it.resolve("Nuvio.lnk"))
-            yield(it.resolve("Nuvio/Nuvio.lnk"))
-        }
-        applicationData?.let {
-            yield(it.resolve("Microsoft/Internet Explorer/Quick Launch/User Pinned/TaskBar/Nuvio.lnk"))
-        }
-        commonDesktop?.let { yield(it.resolve("Nuvio.lnk")) }
-        commonPrograms?.let {
-            yield(it.resolve("Nuvio/Nuvio.lnk"))
-            yield(it.resolve("Nuvio.lnk"))
-        }
-    }
+    private fun shortcutPaths(): Sequence<Path> = windowsShortcutLocations(
+        desktop = knownFolder("Desktop"), programs = knownFolder("Programs"),
+        applicationData = knownFolder("ApplicationData"),
+        commonDesktop = knownFolder("CommonDesktopDirectory"), commonPrograms = knownFolder("CommonPrograms"),
+        architecture = System.getProperty("os.arch"),
+    ).asSequence()
 
     private fun knownFolder(name: String): Path? {
         val command = "[Environment]::GetFolderPath([Environment+SpecialFolder]::$name)"
@@ -116,4 +101,20 @@ internal object WindowsAppShortcutIconUpdater {
     private fun runPowerShell(process: Process, timeoutSeconds: Long = 3) {
         if (!process.waitFor(timeoutSeconds, TimeUnit.SECONDS)) process.destroyForcibly()
     }
+}
+// Keep the fork's icon customization away from official Nuvio shortcuts. Profile
+// and authentication storage intentionally remain independent of this identity.
+internal fun windowsShortcutApplicationName(architecture: String): String =
+    if (architecture.lowercase(java.util.Locale.ROOT) in listOf("arm64", "aarch64")) "Nuvio-ARM64" else "Nuvio"
+
+internal fun windowsShortcutLocations(
+    desktop: Path?, programs: Path?, applicationData: Path?,
+    commonDesktop: Path?, commonPrograms: Path?, architecture: String,
+): List<Path> = buildList {
+    val name = windowsShortcutApplicationName(architecture)
+    desktop?.let { add(it.resolve("$name.lnk")) }
+    programs?.let { add(it.resolve("$name.lnk")); add(it.resolve("$name/$name.lnk")) }
+    applicationData?.let { add(it.resolve("Microsoft/Internet Explorer/Quick Launch/User Pinned/TaskBar/$name.lnk")) }
+    commonDesktop?.let { add(it.resolve("$name.lnk")) }
+    commonPrograms?.let { add(it.resolve("$name/$name.lnk")); add(it.resolve("$name.lnk")) }
 }

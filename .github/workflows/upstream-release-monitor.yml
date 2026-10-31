@@ -1,0 +1,31 @@
+name: Upstream release candidates
+on:
+  schedule:
+    - cron: '43 */6 * * *'
+  workflow_dispatch:
+    inputs:
+      upstream_tag:
+        description: Optional exact release tag (blank scans all public releases)
+        type: string
+permissions:
+  contents: read
+  issues: write
+  actions: write
+concurrency:
+  group: stage6-maintenance
+  cancel-in-progress: false
+jobs:
+  propose:
+    if: github.repository == 'Unitron07/Nuvio-ARM64' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Run trusted downstream automation
+        env:
+          GH_TOKEN: ${{ github.token }}
+          UPSTREAM_TAG: ${{ inputs.upstream_tag }}
+        run: python scripts/automation/downstream.py monitor --tag "$UPSTREAM_TAG"

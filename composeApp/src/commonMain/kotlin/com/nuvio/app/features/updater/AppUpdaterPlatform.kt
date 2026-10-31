@@ -6,6 +6,7 @@ data class AppUpdateReleaseSource(
     val channelBranch: String? = null,
     val includePrereleases: Boolean = false,
     val userAgent: String,
+    val forkArm64: Boolean = false,
 )
 
 data class AppUpdateAssetSelector(

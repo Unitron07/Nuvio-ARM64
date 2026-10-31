@@ -26,6 +26,7 @@ internal data class GitHubAssetDto(
     val name: String,
     @SerialName("browser_download_url") val browserDownloadUrl: String,
     val size: Long? = null,
+    val digest: String? = null,
     @SerialName("content_type") val contentType: String? = null,
 )
 
@@ -67,7 +68,7 @@ internal object AppUpdaterRepository {
         val source = AppUpdaterPlatform.releaseSource
         val response = httpRequestRaw(
             method = "GET",
-            url = "https://api.github.com/repos/${source.owner}/${source.repo}/${releasePath(channel)}",
+            url = "https://api.github.com/repos/${source.owner}/${source.repo}/${releasePath(channel, source.forkArm64)}",
             headers = mapOf(
                 "Accept" to "application/vnd.github+json",
                 "User-Agent" to source.userAgent,
@@ -84,11 +85,12 @@ internal object AppUpdaterRepository {
             channel = channel,
             supportedAbis = AppUpdaterPlatform.getSupportedAbis(),
             selector = AppUpdaterPlatform.assetSelector,
+            forkArm64 = source.forkArm64,
         )
             ?: throw NoChannelReleaseException()
     }
 
-    internal fun releasePath(channel: UpdateChannel): String = when (channel) {
+    internal fun releasePath(channel: UpdateChannel, forkArm64: Boolean = false): String = if (forkArm64) "releases?per_page=100" else when (channel) {
         UpdateChannel.STABLE -> "releases/latest"
         UpdateChannel.BETA -> "releases?per_page=100"
         UpdateChannel.ALL_RELEASES -> "releases?per_page=20"
@@ -98,6 +100,7 @@ internal object AppUpdaterRepository {
         responseBody: String,
         channel: UpdateChannel,
         supportedAbis: List<String>,
+        forkArm64: Boolean = false,
         selector: AppUpdateAssetSelector = AppUpdateAssetSelector(
             fileExtensions = listOf(".apk"),
             contentTypes = listOf("application/vnd.android.package-archive"),
@@ -105,11 +108,12 @@ internal object AppUpdaterRepository {
             fallbackNameFragments = listOf("universal", "all"),
         ),
     ): AppUpdate? {
-        val releases = when (channel) {
+        val releases = if (forkArm64) json.decodeFromString<List<GitHubReleaseDto>>(responseBody) else when (channel) {
             UpdateChannel.STABLE -> listOf(json.decodeFromString<GitHubReleaseDto>(responseBody))
             UpdateChannel.BETA, UpdateChannel.ALL_RELEASES ->
                 json.decodeFromString<List<GitHubReleaseDto>>(responseBody)
         }
+        if (forkArm64) return ForkArm64Updates.select(releases, channel)
         val eligibleReleases = ReleaseSelector.eligibleReleases(releases, channel)
         val releasesToCheck = if (channel == UpdateChannel.ALL_RELEASES) {
             eligibleReleases.take(1)
