@@ -1,0 +1,39 @@
+name: First MSI container checks
+on:
+  pull_request:
+    paths:
+      - scripts/windows/stage6/**
+      - scripts/automation/**
+      - .github/arm64-candidates.json
+      - .github/workflows/first-msi-checks.yml
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: msi-container-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  fixture:
+    runs-on: windows-11-arm
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+        with:
+          persist-credentials: false
+      - uses: actions/setup-java@b6effb05e454b25005698d916606bdc6ffcbf961 # v5
+        with:
+          distribution: microsoft
+          java-version: '21'
+          architecture: aarch64
+      - name: Test MSI envelope using a disposable application and encryption key
+        shell: pwsh
+        run: ./scripts/windows/stage6/Test-InstallerContainer.ps1
+      - uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6
+        if: success()
+        with:
+          name: arm64-msi-container-fixture-results
+          path: |
+            build/msi-container-fixture/RESULT.json
+            build/msi-container-fixture/validation/MSI-VALIDATION.json
+          if-no-files-found: error
+          retention-days: 7

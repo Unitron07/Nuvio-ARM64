@@ -10,7 +10,7 @@ import prepare_candidate as p
 SHA = 'a' * 40
 SOURCE = 'b' * 40
 RECORD = {'release_id': 42, 'upstream_tag': '1.2.3-alpha', 'upstream_sha': SHA,
-          'downstream_sha': SOURCE, 'revision': 1, 'package_sequence': 1}
+          'downstream_sha': SOURCE, 'revision': 1, 'package_sequence': 1, 'delivery_recipient': 'age1' + 'a' * 58}
 
 
 class CandidateTests(unittest.TestCase):

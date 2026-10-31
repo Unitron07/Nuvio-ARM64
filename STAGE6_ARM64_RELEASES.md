@@ -143,3 +143,13 @@ Public artifacts must exclude profiles, credentials, provider URLs, raw logs and
 owner testing data. Development evidence and package inventory are not clearance
 to distribute native binaries. Keep internal candidates access-controlled under
 repository/environment policy until the gates close.
+
+## First MSI preparation after Stage 6 merge
+
+PR #17 is merged. The first proposed candidate uses integrated 0.1.32-alpha,
+application source 086ec17bc8d4e3d01bb868ce7e05af0d519cfb04, downstream revision 1
+and MSI sequence 1. [FIRST_MSI_CANDIDATE.md](FIRST_MSI_CANDIDATE.md) supersedes the
+original empty-ledger/pre-construction status above and documents the jpackage
+MSI architecture defect, WiX4 container, owner-only encryption and exact approval
+steps. Candidate-mode uploads are encrypted; an environment approval alone does
+not make public-repository artifacts private. Public gates remain unchanged.

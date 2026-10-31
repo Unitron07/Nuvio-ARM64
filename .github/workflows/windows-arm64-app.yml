@@ -27,6 +27,15 @@ on:
       package_version:
         type: string
         default: ''
+      delivery_recipient:
+        type: string
+        default: ''
+      upstream_tag:
+        type: string
+        default: ''
+      upstream_sha:
+        type: string
+        default: ''
 permissions:
   contents: read
 jobs:
@@ -37,6 +46,21 @@ jobs:
       - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
         with:
           ref: ${{ inputs.source_ref || github.event.pull_request.head.sha || github.sha }}
+          persist-credentials: false
+      - name: Require approved main candidate context
+        if: inputs.build_msi
+        shell: pwsh
+        env:
+          SOURCE_REF: ${{ inputs.source_ref }}
+        run: |
+          if ('${{ github.ref }}' -ne 'refs/heads/main' -or '${{ github.event_name }}' -ne 'workflow_dispatch') { throw 'MSI candidates require the protected main workflow.' }
+          if ($env:SOURCE_REF -notmatch '^[0-9a-f]{40}$') { throw 'Immutable application source required.' }
+      - name: Check out approved packaging recipe independently of application source
+        if: inputs.build_msi
+        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+        with:
+          ref: ${{ github.sha }}
+          path: .packaging-recipe
           persist-credentials: false
       - name: Verify player shortcut key variants
         run: |
@@ -116,6 +140,7 @@ jobs:
           cmd /c "`"$vcvars`" && cl /nologo /EHsc /std:c++17 scripts/windows/stage5/test-diagnostics.cpp /Fe:build/test-diagnostics.exe /Fo:build/test-diagnostics.obj && build\test-diagnostics.exe"
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
       - uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6
+        if: ${{ !inputs.build_msi }}
         with:
           name: windows-arm64-player-bridge
           path: composeApp/build/native/windows/arm64/player_bridge.dll
@@ -198,13 +223,21 @@ jobs:
         env:
           VERSION_NAME: ${{ inputs.version_name }}
           PACKAGE_VERSION: ${{ inputs.package_version }}
+          UPSTREAM_TAG: ${{ inputs.upstream_tag }}
+          UPSTREAM_SHA: ${{ inputs.upstream_sha }}
         run: |
-          ./scripts/windows/stage6/Build-Installer.ps1 -Version $env:VERSION_NAME -PackageVersion $env:PACKAGE_VERSION
+          ./.packaging-recipe/scripts/windows/stage6/Build-Installer.ps1 -Version $env:VERSION_NAME -PackageVersion $env:PACKAGE_VERSION -RecipeCommit '${{ github.sha }}' -UpstreamTag $env:UPSTREAM_TAG -UpstreamCommit $env:UPSTREAM_SHA
+      - name: Encrypt owner-only installer bundle
+        if: inputs.build_msi
+        shell: pwsh
+        env:
+          DELIVERY_RECIPIENT: ${{ inputs.delivery_recipient }}
+        run: ./.packaging-recipe/scripts/windows/stage6/Protect-Candidate.ps1 -Recipient $env:DELIVERY_RECIPIENT
       - uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6
         if: inputs.build_msi && success()
         with:
-          name: windows-arm64-internal-installer
-          path: build/stage6-installer/
+          name: windows-arm64-owner-encrypted-installer
+          path: build/stage6-encrypted/
           if-no-files-found: error
           retention-days: 7
       - name: Record development artifact status
@@ -215,7 +248,7 @@ jobs:
             'Development evidence only. Runtime launch, playback, licensing and install validation are separate gates.') |
             Set-Content build/ARM64_VALIDATION_STATUS.txt
       - uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6
-        if: always()
+        if: always() && !inputs.build_msi
         with:
           name: windows-arm64-development-evidence
           path: |

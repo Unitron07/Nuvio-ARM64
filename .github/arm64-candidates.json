@@ -1,1 +1,11 @@
-{}
+{
+  "alpha32-r1": {
+    "release_id": 420833706,
+    "upstream_tag": "0.1.32-alpha",
+    "upstream_sha": "da6910dbca048b34c1ba7205fba8a4e6c01dc65e",
+    "downstream_sha": "086ec17bc8d4e3d01bb868ce7e05af0d519cfb04",
+    "revision": 1,
+    "package_sequence": 1,
+    "delivery_recipient": "age12yrxaa67csgxu5cp662yjc4y4h8m9pl40qjy6nktcdr4l3vjt9es9jrqpu"
+  }
+}
