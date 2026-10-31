@@ -23,7 +23,8 @@ Preferences: fork installer identity does not isolate production profile data.
    claimed. Verify the encrypted file with Get-FileHash -Algorithm SHA256 against
    the summary/checksum before decrypting it.
 3. The age identity is saved only on the owner's PC at:
-   `C:/Users/Husi/Documents/Codex/2026-10-30/files-pasted-by-the-user-nuvio/outputs/first-msi-private/owner-age-key.txt`.
+   `outputs/first-msi-private/owner-age-key.txt` in the local Codex workspace.
+   The local handoff gives its full path.
    Keep this file private and make an owner-controlled offline backup; never
    upload it, paste its contents, commit it, or include it in test evidence. Only
    the public recipient is in the ledger. An owner testing on another PC must

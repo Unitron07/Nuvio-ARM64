@@ -16,19 +16,20 @@ New-Item -ItemType Directory -Force $ValidationDirectory | Out-Null
 if (Get-ChildItem -LiteralPath $ValidationDirectory -Force) { throw 'Use an empty MSI validation directory.' }
 $installer=New-Object -ComObject WindowsInstaller.Installer
 $db=$installer.OpenDatabase($Msi,0)
-function Property([string]$Name) {
+function Read-MsiProperty([string]$Name) {
     $view=$db.OpenView("SELECT ``Value`` FROM ``Property`` WHERE ``Property``='$Name'")
-    $view.Execute(); $record=$view.Fetch()
+    [void]$view.Execute(); $record=$view.Fetch()
     if ($null -eq $record) { return '' }
     return $record.StringData(1)
 }
-$actualName=Property 'ProductName'; $actualVersion=Property 'ProductVersion'
-$actualUpgrade=Property 'UpgradeCode'; $productCode=Property 'ProductCode'
+$actualName=Read-MsiProperty 'ProductName'; $actualVersion=Read-MsiProperty 'ProductVersion'
+$actualUpgrade=Read-MsiProperty 'UpgradeCode'; $productCode=Read-MsiProperty 'ProductCode'
+if ((Read-MsiProperty 'Manufacturer') -cne 'Nuvio-ARM64 contributors') { throw 'Unexpected MSI publisher metadata.' }
 $template=$db.SummaryInformation(0).Property(7)
 if ($actualName -cne $ProductName -or $actualVersion -cne $PackageVersion -or
     $actualUpgrade.Trim('{}') -ine $UpgradeCode) { throw 'MSI identity mismatch.' }
 if ($template -notmatch '^Arm64;') { throw "MSI template is not ARM64: $template" }
-if ((Property 'ALLUSERS') -ne '') { throw 'Expected a strictly per-user MSI with no ALLUSERS property.' }
+if ((Read-MsiProperty 'ALLUSERS') -ne '') { throw 'Expected a strictly per-user MSI with no ALLUSERS property.' }
 $db=$null; $installer=$null
 [GC]::Collect(); [GC]::WaitForPendingFinalizers()
 $extract=Join-Path $ValidationDirectory 'extracted'

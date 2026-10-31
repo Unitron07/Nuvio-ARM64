@@ -48,6 +48,7 @@ if ($LASTEXITCODE -ne 0) { throw 'MSI authoring failed.' }
 if ($LASTEXITCODE -ne 0) { throw 'ARM64 WiX compilation failed. Architecture checks may not be suppressed.' }
 & "$PSScriptRoot/Test-MsiPayload.ps1" -Msi $msi -ImageDirectory $image -PackageVersion $PackageVersion
 Copy-Item build/stage6-msi-validation/MSI-VALIDATION.json $destination
+& "$PSScriptRoot/Write-NativeInventory.ps1" -ImageDirectory $image -OutputFile "$destination/NATIVE-INVENTORY.json"
 Copy-Item "$image/ARM64-native-audit.txt" "$destination/NATIVE-ARCHITECTURE-AUDIT.txt"
 $source=(& git rev-parse HEAD).Trim()
 if ($LASTEXITCODE -ne 0) { throw 'Cannot record application source.' }

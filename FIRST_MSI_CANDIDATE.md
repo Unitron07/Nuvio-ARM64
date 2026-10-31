@@ -62,7 +62,10 @@ app-image and author only its MSI container using hash-pinned WiX4 -arch arm64.
 No x64 launcher, foreign JVM or architecture-check suppression is used. The
 container has no custom action scripts and removes only its own files, empty
 installation/menu folders and fork HKCU registration. No profile directory is
-removed. Exact extracted payload bytes, MSI identity/Arm64 scope, PE/JAR resources,
+removed. The native fixture also exposed a COM metadata-reader defect: View.Execute()
+returned an empty output item into property results; suppressing that return
+ensures identity checks compare scalar strings. Exact extracted payload bytes,
+MSI identity/Arm64 scope, PE/JAR resources,
 packaged JVM, notices and extracted native startup are checked. Physical install
 and rollback remain separate owner tests.
 
