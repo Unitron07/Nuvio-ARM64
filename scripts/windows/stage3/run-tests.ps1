@@ -30,6 +30,9 @@ try {
         --tests 'com.nuvio.app.core.ui.ScaledArtworkCacheTest' `
         --tests 'com.nuvio.app.core.ui.ShelfLifecycleTest' `
         --tests 'com.nuvio.app.core.ui.TouchCleanupTest' `
+        --tests 'com.nuvio.app.core.ui.PosterMouseHoverTest' `
+        --tests 'com.nuvio.app.core.ui.PosterCardClickTest' `
+        --tests 'com.nuvio.app.features.home.components.HomePosterHoverPreviewTest' `
         --tests 'com.nuvio.app.core.storage.DesktopStorageTest' `
         --tests 'com.nuvio.app.features.plugins.PluginRuntimeDesktopTest' `
         --tests 'com.nuvio.app.features.player.desktop.NativePlayerControllerTeardownTest' `

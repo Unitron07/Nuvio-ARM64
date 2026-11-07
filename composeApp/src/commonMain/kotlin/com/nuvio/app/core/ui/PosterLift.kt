@@ -110,7 +110,6 @@ internal fun Modifier.posterCardClickable(
     return Modifier
         .desktopPosterHoverScale(
             enabled = hoverScaleEnabled,
-            interactionSource = interactionSource,
         )
         .then(posterModifier)
         .combinedClickable(

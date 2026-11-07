@@ -12,9 +12,7 @@ import androidx.compose.animation.slideOutVertically
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.hoverable
 import androidx.compose.foundation.interaction.MutableInteractionSource
-import androidx.compose.foundation.interaction.collectIsHoveredAsState
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -48,14 +46,13 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.withFrameNanos
 import androidx.compose.ui.Alignment
-import androidx.compose.ui.ExperimentalComposeUiApi
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.pointer.PointerEventType
-import androidx.compose.ui.input.pointer.onPointerEvent
+import androidx.compose.ui.input.pointer.PointerType
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.font.FontWeight
@@ -75,6 +72,8 @@ import com.nuvio.app.core.ui.NuvioAsyncImage
 import com.nuvio.app.core.ui.NuvioPosterWatchedOverlay
 import com.nuvio.app.core.ui.NuvioTokens
 import com.nuvio.app.core.ui.PosterZoomOverlayCoordinator
+import com.nuvio.app.core.ui.PosterMouseHoverState
+import com.nuvio.app.core.ui.posterMouseHover
 import com.nuvio.app.core.ui.nuvio
 import com.nuvio.app.core.ui.rememberPosterCardStyleUiState
 import com.nuvio.app.core.ui.secondaryClick
@@ -109,7 +108,6 @@ private const val HoverPreviewExitDurationMillis = 170
 private const val HoverTrailerExtractionDebounceMillis = 1_000L
 private val HoverPreviewWidth = 420.dp
 
-@OptIn(ExperimentalComposeUiApi::class)
 @Composable
 internal fun HomePosterHoverPreview(
     item: MetaPreview,
@@ -137,13 +135,12 @@ internal fun HomePosterHoverPreview(
         return
     }
 
-    val anchorInteractionSource = remember { MutableInteractionSource() }
-    val previewInteractionSource = remember { MutableInteractionSource() }
-    val anchorHovered by anchorInteractionSource.collectIsHoveredAsState()
-    val previewHovered by previewInteractionSource.collectIsHoveredAsState()
+    val anchorHover = remember(item.type, item.id) { PosterMouseHoverState() }
+    val previewHover = remember(item.type, item.id) { PosterMouseHoverState() }
+    val anchorHovered = anchorHover.hovered
+    val previewHovered = previewHover.hovered
     var previewVisible by remember(item.type, item.id) { mutableStateOf(false) }
     var popupMounted by remember(item.type, item.id) { mutableStateOf(false) }
-    var previewDismissedByScroll by remember(item.type, item.id) { mutableStateOf(false) }
     var trailerRequestId by remember(item.type, item.id) { mutableIntStateOf(0) }
     var trailerResolutionPending by remember(item.type, item.id) { mutableStateOf(false) }
     var trailerPlaybackSource by remember(item.type, item.id) {
@@ -164,18 +161,22 @@ internal fun HomePosterHoverPreview(
         )
     }
 
+    val dismissForDirectInput: () -> Unit = {
+        anchorHover.hovered = false
+        previewHover.hovered = false
+        previewVisible = false
+        popupMounted = false
+    }
+
     LaunchedEffect(
         anchorHovered,
         previewHovered,
         posterCardStyle.hoverPreviewOpenDelayMillis,
-        previewDismissedByScroll,
+        previewHover.pressed,
     ) {
-        if (previewDismissedByScroll) {
-            if (!anchorHovered && !previewHovered) {
-                previewDismissedByScroll = false
-            }
-            return@LaunchedEffect
-        }
+        // Keep existing mouse actions mounted through press/release. This cannot
+        // open a preview; only the poster's unpressed hover intent can do that.
+        if (popupMounted && previewHover.pressed) return@LaunchedEffect
         if (anchorHovered || previewHovered) {
             if (!popupMounted) {
                 delay(posterCardStyle.hoverPreviewOpenDelayMillis.toLong())
@@ -279,7 +280,7 @@ internal fun HomePosterHoverPreview(
     }
 
     Box(modifier = modifier) {
-        content(Modifier.hoverable(anchorInteractionSource))
+        content(Modifier.posterMouseHover(anchorHover, onDirectInput = { dismissForDirectInput() }))
 
         if (popupMounted) {
             Popup(
@@ -325,12 +326,18 @@ internal fun HomePosterHoverPreview(
                         trailerStartSeconds = posterCardStyle.hoverPreviewTrailerStartSeconds,
                         trailerPlaybackSource = trailerPlaybackSource,
                         modifier = Modifier
-                            .hoverable(previewInteractionSource)
-                            .onPointerEvent(PointerEventType.Scroll) {
-                                previewDismissedByScroll = true
-                                previewVisible = false
-                                popupMounted = false
-                            },
+                            .posterMouseHover(
+                                previewHover,
+                                acceptEnter = true,
+                                onDirectInput = { event ->
+                                    anchorHover.hovered = false
+                                    if (event.type == PointerEventType.Scroll ||
+                                        event.changes.any { it.type != PointerType.Mouse }
+                                    ) {
+                                        dismissForDirectInput()
+                                    }
+                                },
+                            ),
                         onClick = onClick,
                         onLongClick = onLongClick,
                         onWatchedClick = onWatchedClick,

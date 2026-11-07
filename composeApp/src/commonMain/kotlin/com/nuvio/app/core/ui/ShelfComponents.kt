@@ -5,9 +5,6 @@ import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.spring
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.hoverable
-import androidx.compose.foundation.interaction.MutableInteractionSource
-import androidx.compose.foundation.interaction.collectIsHoveredAsState
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -477,11 +474,11 @@ private fun NuvioPosterShape.cardWidth(basePosterWidthDp: Int): Dp =
 @Composable
 internal fun Modifier.desktopPosterHoverScale(
     enabled: Boolean = true,
-    interactionSource: MutableInteractionSource = remember { MutableInteractionSource() },
 ): Modifier {
     if (!enabled || !isDesktop) return this
 
-    val hovered by interactionSource.collectIsHoveredAsState()
+    val hover = remember { PosterMouseHoverState() }
+    val hovered = hover.hovered
     val scale by animateFloatAsState(
         targetValue = if (hovered) DesktopPosterHoverScale else 1f,
         animationSpec = spring(
@@ -506,5 +503,5 @@ internal fun Modifier.desktopPosterHoverScale(
                 Modifier
             },
         )
-        .hoverable(interactionSource)
+        .posterMouseHover(hover)
 }
