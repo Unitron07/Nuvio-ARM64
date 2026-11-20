@@ -1,0 +1,20 @@
+{
+  "_comment": "Read by scripts/automation/conflict_rules.py from the trusted main checkout. Owner-reviewed: widening these globs widens what the sync bot may resolve without a human.",
+  "union_paths": [
+    "composeApp/src/*/composeResources/values*/strings.xml",
+    "composeApp/src/desktopMain/resources/player-ui/*.css"
+  ],
+  "fork_modifier_patterns": [
+    "\\.nuvioDesktopVerticalDragScroll\\([^()\\n]*\\)",
+    "\\.nuvioDesktopAxisDragScroll\\([^()\\n]*\\)",
+    "\\.nuvioScrollFrameProbe\\([^()\\n]*\\)"
+  ],
+  "never_auto_paths": [
+    ".github/*",
+    "scripts/automation/*",
+    "composeApp/src/desktopMain/native/*",
+    "composeApp/src/desktopMain/kotlin/com/nuvio/app/features/player/*",
+    "*.gradle.kts",
+    "gradle/*"
+  ]
+}

@@ -16,6 +16,9 @@ import urllib.error
 import urllib.parse
 import urllib.request
 
+import conflict_rules
+
+CONFLICT_MARKER = "<!-- upstream-conflict -->"
 
 def git(*args, cwd=None, ok=(0,), authenticated=False):
     env = dict(os.environ, GIT_LFS_SKIP_SMUDGE="1", GIT_TERMINAL_PROMPT="0")
@@ -156,19 +159,35 @@ def sync(api, repo, upstream, branch, tag=""):
         try:
             git("config", "user.name", "github-actions[bot]", cwd=work)
             git("config", "user.email", "41898282+github-actions[bot]@users.noreply.github.com", cwd=work)
-            result = subprocess.run(["git", "-c", "core.hooksPath=/dev/null", "merge", "--no-ff", "--no-commit", candidate],
+            result = subprocess.run(["git", "-c", "core.hooksPath=/dev/null", "-c", "merge.conflictStyle=diff3",
+                                     "merge", "--no-ff", "--no-commit", candidate],
                                     cwd=work, capture_output=True, text=True,
                                     env=dict(os.environ, GIT_LFS_SKIP_SMUDGE="1"))
+            resolution = ""
             if result.returncode:
                 conflicts = git("diff", "--name-only", "--diff-filter=U", cwd=work)
-                git("merge", "--abort", cwd=work)
                 if not conflicts:
+                    git("merge", "--abort", cwd=work)
                     raise RuntimeError("Integration failed without merge conflicts: " + result.stderr)
-                issue = upsert_issue(api, repo, f"<!-- upstream-conflict:{candidate} -->",
-                    f"Upstream sync requires manual intervention: {candidate[:12]}",
-                    body + f"\nMerge conflicts (no integration commit created):\n```text\n{conflicts}\n```\n")
-                summary(issue["html_url"])
-                return
+                # Rules come from this trusted checkout, never from the merge worktree.
+                outcome = conflict_rules.resolve_worktree(
+                    work, rules=conflict_rules.load_rules(), git=lambda *a, cwd=None: git(*a, cwd=cwd))
+                report = conflict_rules.format_report(outcome)
+                if outcome["unresolved"]:
+                    git("merge", "--abort", cwd=work)
+                    # One rolling issue instead of one per upstream commit.
+                    issue = upsert_issue(api, repo, CONFLICT_MARKER,
+                        f"Upstream sync blocked: {len(outcome['unresolved'])} file(s) need manual merge",
+                        body + f"\nLatest attempt: `{candidate}` (no integration commit created).\n\n"
+                        f"{report}\nResolve locally: merge `{candidate}` into main, then run "
+                        "`python scripts/automation/conflict_rules.py` to apply the automatic rules "
+                        "and finish the files marked manual.\n")
+                    if issue.get("state") == "closed":
+                        api.request("PATCH", f"repos/{repo}/issues/{issue['number']}", {"state": "open"})
+                    summary(issue["html_url"])
+                    return
+                resolution = ("\nMerge conflict status: **auto-resolved by owner-reviewed rules** "
+                              "(`.github/upstream-merge-rules.json`). Review every listed hunk.\n\n" + report)
             git("commit", "-m", f"Merge {upstream} {branch} at {candidate}", cwd=work)
             # Refuse stale snapshots; a normal push never rewrites a shared branch.
             if git("ls-remote", "origin", "refs/heads/main").split()[0] != base:
@@ -178,8 +197,10 @@ def sync(api, repo, upstream, branch, tag=""):
             git("worktree", "remove", "--force", str(work))
         existing = api.request("POST", f"repos/{repo}/pulls", {
             "title": f"Upstream Sync: NuvioDesktop {branch} — {datetime.date.today()}",
-            "head": name, "base": "main", "draft": True, "body": body + "\nMerge conflict status: clean at creation.\n"})
-        api.request("POST", f"repos/{repo}/issues/{existing['number']}/labels", {"labels": ["upstream-sync"]})
+            "head": name, "base": "main", "draft": True,
+            "body": body + (resolution or "\nMerge conflict status: clean at creation.\n")})
+        labels = ["upstream-sync"] + (["auto-resolved"] if resolution else [])
+        api.request("POST", f"repos/{repo}/issues/{existing['number']}/labels", {"labels": labels})
     # Existing bot branches are immutable. Dispatch exact PR head through a trusted
     # default-branch workflow; GITHUB_TOKEN push/PR events alone are insufficient.
     if not existing["draft"]:
@@ -250,8 +271,9 @@ def main():
     api = GitHub()
     if args.command == "sync":
         # Label is idempotent and never executes a fetched script.
-        if api.request("GET", f"repos/{repo}/labels/upstream-sync", missing=True) is None:
-            api.request("POST", f"repos/{repo}/labels", {"name": "upstream-sync", "color": "0366d6"})
+        for label, color in (("upstream-sync", "0366d6"), ("auto-resolved", "fbca04")):
+            if api.request("GET", f"repos/{repo}/labels/{label}", missing=True) is None:
+                api.request("POST", f"repos/{repo}/labels", {"name": label, "color": color})
         sync(api, repo, args.upstream, args.branch, args.tag)
     else:
         monitor(api, repo, args.upstream, args.tag)

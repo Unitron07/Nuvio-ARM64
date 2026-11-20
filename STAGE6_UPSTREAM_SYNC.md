@@ -107,3 +107,45 @@ The merge was aborted and the temporary worktree removed. No integration commit,
 main change, or upstream preference resolution was made. Review Stage 4 touch
 controls when resolving this conflict; clean merges in other files still need
 the full regression suite.
+
+## Rule-based conflict resolution (Stage 7)
+
+Every scheduled attempt from 0.1.33 to 0.1.38 stopped on conflicts and opened a
+new issue, so the fork fell 606 commits behind. Sync now merges with diff3 markers
+and passes each conflicted file to `scripts/automation/conflict_rules.py`. That
+script is standard-library only, treats upstream content as data and reads
+`.github/upstream-merge-rules.json` from the trusted main checkout. Each hunk is
+either resolved by one named rule or left for a human:
+
+| Rule | Resolves |
+|---|---|
+| `identical` | both sides made the same change |
+| `contained` | both added code and one addition already includes the other |
+| `union` | both appended to an allowlisted resource (string table, player CSS) |
+| `imports` | Kotlin import blocks: upstream's set, minus imports the fork removed, plus fork imports still referenced |
+| `fork-modifier` | the fork only appended its scroll modifiers; they are reapplied after the same unique anchor call in upstream's rewritten line |
+
+A file is staged only when all of its hunks resolve, and resource XML must still
+parse with no duplicate names. Paths in `never_auto_paths` (workflows,
+automation, native code, the desktop player, Gradle) are always left manual.
+If every file resolves, the bot opens the usual draft PR, labelled
+`auto-resolved`, with a per-hunk report. It is never merged automatically. If any
+file is left, the merge is aborted and one rolling `<!-- upstream-conflict -->`
+issue is updated (and reopened when it was closed) instead of opening a new
+issue per commit. Maintainers stopped on a conflicted merge can run
+`python scripts/automation/conflict_rules.py` (or `--dry-run`) locally.
+
+On the 0.1.38 merge (upstream Dev `bcb930c2`), the rules resolved 9 of the 14
+conflicted files, with output identical to the hand resolution apart from line
+breaks. Five files were resolved by hand: `DropdownChip.kt`, `ShelfComponents.kt`,
+`Main.kt` (one hunk), `NativePlayerController.kt` and `player_bridge.cpp`.
+
+Touch scrolling after 0.1.38: upstream added a window-level Windows touch
+fallback (`WindowsTouchScroll.kt`) that converts unhandled touch drags into wheel
+events. Both systems read the Main pointer pass, where the innermost handler
+sees an event first, so the fork's drag scroll on a container takes and consumes
+the drag. The fallback then stops (`change.isConsumed`), which prevents double
+scrolling. The fallback covers surfaces the fork never wired up, such as
+dialogs, popups and menus. New upstream settings pages use the plain
+`LazyColumn`, so they scroll through the fallback without fork momentum. This
+needs Surface validation before any candidate build.
