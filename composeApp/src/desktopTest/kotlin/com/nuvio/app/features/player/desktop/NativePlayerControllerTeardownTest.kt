@@ -14,7 +14,7 @@ import kotlin.test.assertNotNull
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
-private val failNativeCreate: NativePlayerCreate = { _, _, _, _, _, _, _, _, _ ->
+private val failNativeCreate: NativePlayerCreate = { _, _, _, _, _, _, _, _, _, _ ->
     error("native create must not run in lifecycle unit tests")
 }
 
@@ -80,7 +80,7 @@ class NativePlayerControllerTeardownTest {
         val controller = NativePlayerController(
             resolveControlsPage = { "about:blank" },
             host = NativePlayerHost(),
-            nativeCreate = { _, source, _, _, _, _, _, _, _ ->
+            nativeCreate = { _, source, _, _, _, _, _, _, _, _ ->
                 createdSources += source
                 when (source) {
                     sourceA -> {

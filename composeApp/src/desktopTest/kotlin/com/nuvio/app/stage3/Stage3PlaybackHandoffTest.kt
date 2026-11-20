@@ -23,7 +23,7 @@ class Stage3PlaybackHandoffTest {
                 var disposedHandle = 0L
                 val controller = NativePlayerController(
                     host = NativePlayerHost(),
-                    nativeCreate = { _, source, headers, play, position, _, _, _, _ ->
+                    nativeCreate = { _, source, headers, play, position, _, _, _, _, _ ->
                         capturedSource = source
                         capturedHeaders = headers.toList()
                         capturedPosition = position

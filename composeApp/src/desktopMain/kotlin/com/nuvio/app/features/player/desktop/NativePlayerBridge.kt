@@ -61,6 +61,7 @@ internal object NativePlayerBridge {
         controlsPageUrl: String,
         decoderPriority: Int,
         nvidiaRtxSuperResolutionEnabled: Boolean,
+        nvidiaRtxHdrEnabled: Boolean,
         eventSink: NativePlayerEventSink,
     ): Long
 
@@ -119,6 +120,7 @@ internal object NativePlayerBridge {
     )
     external fun setMacosWindowFullscreen(windowViewPtr: Long, fullscreen: Boolean)
 
+    external fun setSubtitleVisible(handle: Long, visible: Boolean)
     external fun setSubtitleDelayMs(handle: Long, delayMs: Int)
     external fun applySubtitleStyle(
         handle: Long,
@@ -131,6 +133,13 @@ internal object NativePlayerBridge {
         subPos: Int,
         useLibass: Boolean,
         stripSdh: Boolean,
+    )
+    external fun setSubtitleAppearance(
+        handle: Long,
+        font: String,
+        fontsDir: String,
+        shadowColor: String,
+        shadowOffset: Float,
     )
     external fun warmupWebView2(controlsPageUrl: String): Boolean
     external fun shutdownWebView2Warmup()

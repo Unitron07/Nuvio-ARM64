@@ -14,6 +14,7 @@
 #include <mpv/render_gl.h>
 
 #include <atomic>
+#include <clocale>
 #include <cmath>
 #include <dlfcn.h>
 #include <mutex>
@@ -157,6 +158,7 @@ static constexpr double kMaxVolumePercent = 200.0;
 - (void)removeExternalSubtitles;
 - (void)removeExternalSubtitlesAndSelect:(int)trackId;
 - (void)setSubtitleDelayMs:(int)delayMs;
+- (void)setSubtitleVisible:(BOOL)visible;
 - (void)applySubtitleStyleWithTextColor:(NSString *)textColor
                         backgroundColor:(NSString *)backgroundColor
                             outlineColor:(NSString *)outlineColor
@@ -166,6 +168,10 @@ static constexpr double kMaxVolumePercent = 200.0;
                                   subPos:(int)subPos
                                useLibass:(BOOL)useLibass
                                 stripSdh:(BOOL)stripSdh;
+- (void)applySubtitleAppearanceWithFont:(NSString *)font
+                              fontsDir:(NSString *)fontsDir
+                           shadowColor:(NSString *)shadowColor
+                          shadowOffset:(double)shadowOffset;
 - (void)handleScriptMessage:(NSDictionary *)message;
 - (void)startMpvEventDrain;
 - (void)applyVolumeSplit:(double)percent;
@@ -1713,6 +1719,14 @@ static void setMpvOptionString(mpv_handle *mpv, const char *name, const char *va
               playWhenReady:(BOOL)playWhenReady
            initialPositionMs:(long long)initialPositionMs
             decoderPriority:(int)decoderPriority {
+    // libmpv requires LC_NUMERIC=C: non-"C" locales that use comma decimals
+    // make mpv_create fail. The JVM formats numbers through java.util.Locale,
+    // so this C-level change does not affect Java number formatting.
+    if (setlocale(LC_NUMERIC, "C") == nullptr) {
+        @throw [NSException exceptionWithName:@"PlayerBridgeError"
+                                       reason:@"setlocale(LC_NUMERIC, \"C\") failed"
+                                     userInfo:nil];
+    }
     _mpv = mpv_create();
     if (!_mpv) {
         @throw [NSException exceptionWithName:@"PlayerBridgeError"
@@ -1753,7 +1767,6 @@ static void setMpvOptionString(mpv_handle *mpv, const char *name, const char *va
         "stream-lavf-o",
         "reconnect=1,reconnect_streamed=1,reconnect_on_network_error=1,reconnect_on_http_error=%23%408,429,500,502,503,504,reconnect_delay_max=15"
     );
-    setMpvOptionString(_mpv, "hr-seek", "no");
 
     if (headerLines.count > 0) {
         NSMutableArray *escaped = [NSMutableArray arrayWithCapacity:headerLines.count];
@@ -2136,7 +2149,7 @@ static void setMpvOptionString(mpv_handle *mpv, const char *name, const char *va
 - (void)seekToMilliseconds:(long long)positionMs {
     if (!_mpv) return;
     std::string seconds = std::to_string((double)positionMs / 1000.0);
-    const char *command[] = {"seek", seconds.c_str(), "absolute+keyframes", NULL};
+    const char *command[] = {"seek", seconds.c_str(), "absolute+exact", NULL};
     mpv_command(_mpv, command);
     [self storeCachedPosition:(double)positionMs / 1000.0 at:CACurrentMediaTime()];
 }
@@ -2144,7 +2157,7 @@ static void setMpvOptionString(mpv_handle *mpv, const char *name, const char *va
 - (void)seekByMilliseconds:(long long)offsetMs {
     if (!_mpv) return;
     std::string seconds = std::to_string((double)offsetMs / 1000.0);
-    const char *command[] = {"seek", seconds.c_str(), "relative+keyframes", NULL};
+    const char *command[] = {"seek", seconds.c_str(), "relative+exact", NULL};
     mpv_command(_mpv, command);
     [self storeCachedPosition:[self estimatedPositionSeconds] + ((double)offsetMs / 1000.0) at:CACurrentMediaTime()];
 }
@@ -2496,11 +2509,27 @@ static void nuvioMpvWakeup(void *ctx) {
     }
 }
 
+- (void)setSubtitleVisible:(BOOL)visible {
+    if (!_mpv) return;
+    [self setStringProperty:"sub-visibility" value:visible ? @"yes" : @"no"];
+}
+
 - (void)setSubtitleDelayMs:(int)delayMs {
     if (!_mpv) return;
     int clamped = MAX(-60000, MIN(60000, delayMs));
     double delaySeconds = (double)clamped / 1000.0;
     mpv_set_property(_mpv, "sub-delay", MPV_FORMAT_DOUBLE, &delaySeconds);
+}
+
+- (void)applySubtitleAppearanceWithFont:(NSString *)font
+                              fontsDir:(NSString *)fontsDir
+                           shadowColor:(NSString *)shadowColor
+                          shadowOffset:(double)shadowOffset {
+    if (!_mpv) return;
+    if (fontsDir.length > 0) [self setStringProperty:"sub-fonts-dir" value:fontsDir];
+    [self setStringProperty:"sub-font" value:font];
+    [self setStringProperty:"sub-shadow-color" value:shadowColor];
+    mpv_set_property(_mpv, "sub-shadow-offset", MPV_FORMAT_DOUBLE, &shadowOffset);
 }
 
 - (void)applySubtitleStyleWithTextColor:(NSString *)textColor
@@ -2514,7 +2543,7 @@ static void nuvioMpvWakeup(void *ctx) {
                                 stripSdh:(BOOL)stripSdh {
     if (!_mpv) return;
     double size = MAX(18.0, MIN(96.0, fontSize));
-    double scale = useLibass ? size / 54.0 : 1.0;
+    double scale = 1.0;
     int64_t position = MAX(0, MIN(150, subPos));
     double outline = MAX(0.0, MIN(8.0, outlineSize));
     NSString *resolvedTextColor = textColor ?: @"#FFFFFFFF";
@@ -2534,16 +2563,10 @@ static void nuvioMpvWakeup(void *ctx) {
     BOOL stripSdhChanged = !_hasAppliedSubtitleStyle || _appliedSubtitleStripSdh != stripSdh;
 
     if (modeChanged) {
-        [self setStringProperty:"sub-ass-override" value:useLibass ? @"scale" : @"force"];
+        [self setStringProperty:"sub-ass-override" value:@"no"];
     }
-    if (modeChanged || (!useLibass && boldChanged)) {
-        const char *styleOverridesCommand[] = {
-            "change-list",
-            "sub-ass-style-overrides",
-            useLibass ? "clr" : "set",
-            useLibass ? "" : (bold ? "Bold=1" : "Bold=0"),
-            NULL,
-        };
+    if (modeChanged) {
+        const char *styleOverridesCommand[] = {"change-list", "sub-ass-style-overrides", "clr", "", NULL};
         mpv_command(_mpv, styleOverridesCommand);
     }
     if (modeChanged || sizeChanged) {
@@ -2554,14 +2577,14 @@ static void nuvioMpvWakeup(void *ctx) {
         mpv_set_property(_mpv, "sub-pos", MPV_FORMAT_INT64, &position);
     }
 
-    if (!useLibass) {
+    {
         if (modeChanged || textColorChanged) {
             [self setStringProperty:"sub-color" value:resolvedTextColor];
         }
         if (modeChanged || backgroundColorChanged) {
             [self setStringProperty:"sub-back-color" value:resolvedBackgroundColor];
             [self setStringProperty:"sub-border-style"
-                              value:[resolvedBackgroundColor hasPrefix:@"#00"] ? @"outline-and-shadow" : @"opaque-box"];
+                              value:[resolvedBackgroundColor hasPrefix:@"#00"] ? @"outline-and-shadow" : @"background-box"];
         }
         if (modeChanged || outlineColorChanged) {
             [self setStringProperty:"sub-outline-color" value:resolvedOutlineColor];
@@ -3205,6 +3228,7 @@ Java_com_nuvio_app_features_player_desktop_NativePlayerBridge_create(
     jstring controlsPageUrl,
     jint decoderPriority,
     jboolean nvidiaRtxSuperResolutionEnabled,
+    jboolean /*nvidiaRtxHdrEnabled*/,
     jobject eventSink
 ) {
     NSView *hostView = (__bridge NSView *)(void *)(intptr_t)hostViewPtr;
@@ -3685,6 +3709,20 @@ Java_com_nuvio_app_features_player_desktop_NativePlayerBridge_clearExternalSubti
 }
 
 extern "C" JNIEXPORT void JNICALL
+Java_com_nuvio_app_features_player_desktop_NativePlayerBridge_setSubtitleVisible(
+    JNIEnv * /* env */,
+    jobject /* bridge */,
+    jlong handle,
+    jboolean visible
+) {
+    if (handle == 0) return;
+    MpvWebPlayer *player = (__bridge MpvWebPlayer *)(void *)(intptr_t)handle;
+    runOnMainAsync(^{
+        [player setSubtitleVisible:visible == JNI_TRUE];
+    });
+}
+
+extern "C" JNIEXPORT void JNICALL
 Java_com_nuvio_app_features_player_desktop_NativePlayerBridge_setSubtitleDelayMs(
     JNIEnv * /* env */,
     jobject /* bridge */,
@@ -3728,5 +3766,28 @@ Java_com_nuvio_app_features_player_desktop_NativePlayerBridge_applySubtitleStyle
                                           subPos:(int)subPos
                                        useLibass:useLibass == JNI_TRUE
                                         stripSdh:stripSdh == JNI_TRUE];
+    });
+}
+
+extern "C" JNIEXPORT void JNICALL
+Java_com_nuvio_app_features_player_desktop_NativePlayerBridge_setSubtitleAppearance(
+    JNIEnv *env,
+    jobject /* bridge */,
+    jlong handle,
+    jstring font,
+    jstring fontsDir,
+    jstring shadowColor,
+    jfloat shadowOffset
+) {
+    if (handle == 0) return;
+    std::string fontName = jstringToString(env, font);
+    std::string dir = jstringToString(env, fontsDir);
+    std::string shadow = jstringToString(env, shadowColor);
+    MpvWebPlayer *player = (__bridge MpvWebPlayer *)(void *)(intptr_t)handle;
+    runOnMainAsync(^{
+        [player applySubtitleAppearanceWithFont:[NSString stringWithUTF8String:fontName.c_str()]
+                                       fontsDir:[NSString stringWithUTF8String:dir.c_str()]
+                                    shadowColor:[NSString stringWithUTF8String:shadow.c_str()]
+                                   shadowOffset:(double)shadowOffset];
     });
 }

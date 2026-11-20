@@ -23,7 +23,7 @@ class Stage3PlaybackFailureTest {
             resolveControlsPage = { "about:blank" },
             isHostDisplayable = { true },
             resolveHostView = { 1L },
-            nativeCreate = { _, source, _, _, _, _, _, _, sink ->
+            nativeCreate = { _, source, _, _, _, _, _, _, _, sink ->
                 val index = source.last().digitToInt()
                 sinks[index] = sink
                 started[index].countDown()
