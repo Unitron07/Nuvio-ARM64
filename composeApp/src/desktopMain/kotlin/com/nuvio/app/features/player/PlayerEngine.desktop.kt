@@ -19,6 +19,7 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
@@ -36,6 +37,9 @@ import com.nuvio.app.features.player.desktop.DesktopPlayerPictureInPicture
 import com.nuvio.app.features.player.desktop.NativePlayerController
 import com.nuvio.app.features.player.desktop.NativePlayerHost
 import com.nuvio.app.features.player.desktop.desktopFullscreenChanges
+import com.nuvio.app.features.autosync.AutoSyncMpvCoordinator
+import com.nuvio.app.features.autosync.DesktopAutoSyncMpvPlatform
+import com.nuvio.app.features.autosync.withAutoSyncMessage
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.drop
 
@@ -74,6 +78,7 @@ actual fun PlatformPlayerSurface(
             sourceUrl = sourceUrl,
             sourceAvailable = sourceAvailable,
             sourceHeaders = sourceHeaders,
+            externalSubtitles = externalSubtitles,
             modifier = modifier,
             playWhenReady = playWhenReady,
             resizeMode = resizeMode,
@@ -106,6 +111,7 @@ private fun NativePlayerSurface(
     sourceUrl: String,
     sourceAvailable: Boolean,
     sourceHeaders: Map<String, String>,
+    externalSubtitles: List<com.nuvio.app.features.streams.StreamSubtitle>,
     modifier: Modifier,
     playWhenReady: Boolean,
     resizeMode: PlayerResizeMode,
@@ -127,19 +133,52 @@ private fun NativePlayerSurface(
     val hostFirstPaintComplete = remember { mutableStateOf(false) }
     val hostFirstFullSizePaintComplete = remember { mutableStateOf(false) }
     val playbackHeaders = remember(sourceHeaders) { sanitizePlaybackHeaders(sourceHeaders) }
+    val latestExternalSubtitles = rememberUpdatedState(externalSubtitles)
+    val latestPlayerControlsState = rememberUpdatedState(playerControlsState)
+    val autoSyncScope = rememberCoroutineScope()
+    // Kept across sources so its message count, part of the overlay's notification token, only grows.
+    val autoSyncPlatform = remember {
+        DesktopAutoSyncMpvPlatform(
+            currentNotificationToken = { latestPlayerControlsState.value.notificationToken },
+        )
+    }
+    val autoSyncCoordinator = remember(sourceUrl, playbackHeaders, autoSyncScope) {
+        AutoSyncMpvCoordinator(
+            scope = autoSyncScope,
+            sourceUrl = sourceUrl,
+            sourceHeaders = playbackHeaders,
+            getSubtitleHeaders = { subtitleUrl ->
+                latestExternalSubtitles.value
+                    .firstOrNull { it.url == subtitleUrl }
+                    ?.headers
+                    .orEmpty()
+            },
+            getPreferredLanguage = { PlayerSettingsRepository.uiState.value.preferredSubtitleLanguage },
+            platform = autoSyncPlatform,
+        )
+    }
+    DisposableEffect(autoSyncCoordinator) {
+        onDispose { autoSyncCoordinator.dispose() }
+    }
+    val readyController = remember(controller, autoSyncCoordinator) {
+        // setSubtitleUri replaces the external subtitles, so the retimed copy takes the original's place.
+        autoSyncCoordinator.wrap(controller) { _, path -> controller.setSubtitleUri(path) }
+    }
+    val controlsState = playerControlsState.withAutoSyncMessage(autoSyncPlatform.message)
+    val latestControlsState = rememberUpdatedState(controlsState)
     val latestOnPlayerControlsAction = rememberUpdatedState(onPlayerControlsAction)
     val latestOnPlayerControlsEvent = rememberUpdatedState(onPlayerControlsEvent)
     val latestOnPlayerControlsScrubChange = rememberUpdatedState(onPlayerControlsScrubChange)
     val latestOnPlayerControlsScrubFinished = rememberUpdatedState(onPlayerControlsScrubFinished)
     val latestOnInitialPositionHandled = rememberUpdatedState(onInitialPositionHandled)
     val latestOnError = rememberUpdatedState(onError)
-    val latestPlayerControlsState = rememberUpdatedState(playerControlsState)
     val playerSettings by PlayerSettingsRepository.uiState.collectAsState()
     val decoderPriority = playerSettings.decoderPriority
     val nvidiaRtxSuperResolutionEnabled = playerSettings.nvidiaRtxSuperResolutionEnabled
+    val nvidiaRtxHdrEnabled = playerSettings.nvidiaRtxHdrEnabled
 
     SideEffect {
-        onControllerReady(controller)
+        onControllerReady(readyController)
     }
 
     DisposableEffect(host) {
@@ -198,6 +237,7 @@ private fun NativePlayerSurface(
         playbackHeaders,
         decoderPriority,
         nvidiaRtxSuperResolutionEnabled,
+        nvidiaRtxHdrEnabled,
         hostFirstFullSizePaintComplete.value,
         initialPositionMs,
         initialPositionRequestKey,
@@ -213,12 +253,13 @@ private fun NativePlayerSurface(
             initialPositionMs = initialPositionMs,
             decoderPriority = decoderPriority,
             nvidiaRtxSuperResolutionEnabled = nvidiaRtxSuperResolutionEnabled,
+            nvidiaRtxHdrEnabled = nvidiaRtxHdrEnabled,
             onError = { message -> latestOnError.value(message) },
         )
         initialPositionRequestKey?.let { key ->
             latestOnInitialPositionHandled.value(key, initialPositionMs > 0L)
         }
-        onControllerReady(controller)
+        onControllerReady(readyController)
     }
 
     LaunchedEffect(controller, sourceAvailable, playWhenReady) {
@@ -234,14 +275,14 @@ private fun NativePlayerSurface(
         controller.setResizeMode(resizeMode)
     }
 
-    LaunchedEffect(controller, playerControlsState) {
-        controller.updateControls(playerControlsState)
-        DesktopPlayerPictureInPicture.setWindowTitle(playerControlsState.pipWindowTitle)
+    LaunchedEffect(controller, controlsState) {
+        controller.updateControls(controlsState)
+        DesktopPlayerPictureInPicture.setWindowTitle(controlsState.pipWindowTitle)
     }
 
     LaunchedEffect(controller) {
         DesktopPlayerPictureInPicture.changes.drop(1).collect {
-            controller.updateControls(latestPlayerControlsState.value)
+            controller.updateControls(latestControlsState.value)
         }
     }
 

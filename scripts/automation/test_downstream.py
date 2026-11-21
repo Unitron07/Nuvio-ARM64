@@ -126,12 +126,39 @@ class SyncTests(unittest.TestCase):
 
     @patch.object(d, "ancestry", return_value=False)
     def test_conflict_reports_files_without_commit_or_push(self, ancestor):
+        outcome = {"resolved": {"a.xml": "#1 union"}, "unresolved": {"file.kt": "#1 manual"}}
         with patch.object(d, "git", side_effect=self.fake_git) as git, \
              patch.object(d.subprocess, "run", return_value=Mock(returncode=1)), \
-             patch.object(d, "upsert_issue", return_value={"html_url": "conflict"}) as issue:
+             patch.object(d.conflict_rules, "load_rules", return_value={}), \
+             patch.object(d.conflict_rules, "resolve_worktree", return_value=outcome), \
+             patch.object(d, "upsert_issue", return_value={"html_url": "conflict", "number": 3, "state": "closed"}) as issue:
             d.sync(self.api, "test/repo", "up/repo", "Dev")
         self.assertFalse(any(c.args[0] in ("commit", "push") for c in git.call_args_list))
+        self.assertTrue(any(c.args[:2] == ("merge", "--abort") for c in git.call_args_list))
         self.assertIn("file.kt", issue.call_args.args[-1])
+        # A single rolling issue, reopened when a previous blockage was closed.
+        self.assertEqual(issue.call_args.args[2], d.CONFLICT_MARKER)
+        self.api.request.assert_any_call("PATCH", "repos/test/repo/issues/3", {"state": "open"})
+
+    @patch.object(d, "ancestry", return_value=False)
+    def test_fully_auto_resolved_conflict_opens_labeled_draft(self, ancestor):
+        outcome = {"resolved": {"a.xml": "#1 union"}, "unresolved": {}}
+        self.api.request.side_effect = lambda method, path, data=None, **kw: (
+            {"number": 8, "draft": True, "html_url": "pr", "body": data["body"], "head": {"sha": SHA}}
+            if path.endswith("/pulls") else None)
+        with patch.object(d, "git", side_effect=self.fake_git) as git, \
+             patch.object(d.subprocess, "run", return_value=Mock(returncode=1)), \
+             patch.object(d.conflict_rules, "load_rules", return_value={}), \
+             patch.object(d.conflict_rules, "resolve_worktree", return_value=outcome):
+            d.sync(self.api, "test/repo", "up/repo", "Dev")
+        self.assertTrue(any(c.args[0] == "commit" for c in git.call_args_list))
+        self.assertFalse(any(c.args[:2] == ("merge", "--abort") for c in git.call_args_list))
+        pr = next(c for c in self.api.request.call_args_list if c.args[1].endswith("/pulls"))
+        self.assertTrue(pr.args[2]["draft"])
+        self.assertIn("auto-resolved", pr.args[2]["body"])
+        self.assertIn("a.xml", pr.args[2]["body"])
+        self.api.request.assert_any_call("POST", "repos/test/repo/issues/8/labels",
+                                         {"labels": ["upstream-sync", "auto-resolved"]})
 
     @patch.object(d, "ancestry", return_value=False)
     def test_moved_main_cannot_push_stale_integration(self, ancestor):

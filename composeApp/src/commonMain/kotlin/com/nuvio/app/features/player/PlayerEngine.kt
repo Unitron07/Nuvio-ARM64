@@ -17,6 +17,8 @@ interface PlayerEngineController {
     fun retry()
     fun setPlaybackSpeed(speed: Float)
     fun setMuted(muted: Boolean) {}
+    /** Adjusts output volume by [deltaFraction] on a 0..1 scale; true when the platform applied it. */
+    fun adjustVolumeBy(deltaFraction: Float): Boolean = false
     fun getAudioTracks(): List<AudioTrack>
     fun getSubtitleTracks(): List<SubtitleTrack>
     fun applyAudioLanguagePreferences(languages: List<String>)
@@ -34,7 +36,20 @@ interface PlayerEngineController {
         hasActiveSubtitle: Boolean,
         useCustomSubtitles: Boolean = false,
     ) {}
+    fun setSubtitleVisible(visible: Boolean) {}
     fun setSubtitleDelayMs(delayMs: Int) {}
+    /** Whether [setAudioDelayMs] has an effect; the player hides the audio delay control otherwise. */
+    val supportsAudioDelay: Boolean get() = false
+    /** Plays the audio [delayMs] later than the video; negative values play it earlier. */
+    fun setAudioDelayMs(delayMs: Int) {}
+    /** Whether [setAudioAmplificationDb] has an effect; the player hides the amplification control otherwise. */
+    val supportsAudioAmplification: Boolean get() = false
+    /** Boosts the audio by [db] decibels, from 0 (off) to [AUDIO_AMPLIFICATION_MAX_DB]. */
+    fun setAudioAmplificationDb(db: Int) {}
+    /** Whether the audio playing now goes through a downmix whose center level [setCenterMixLevelDb] changes. */
+    fun isCenterMixActive(): Boolean = false
+    /** Center channel level in the downmix, from [CENTER_MIX_LEVEL_MIN_DB] to [CENTER_MIX_LEVEL_MAX_DB]. */
+    fun setCenterMixLevelDb(db: Int) {}
     fun configureIosVideoOutput(settings: PlayerSettingsUiState) {}
     fun updateNowPlayingMetadata(info: PlayerNowPlayingInfo) {}
     fun clearNowPlayingInfo() {}
@@ -48,6 +63,8 @@ interface PlayerEngineController {
     }
 
     suspend fun getMediaInfo(): PlayerMediaInfo = PlayerMediaInfo()
+    /** The loaded file's chapters, unsorted; empty when the engine cannot read them. */
+    suspend fun getChapters(): List<PlayerChapter> = emptyList()
 }
 
 enum class PlayerControlsAction {
@@ -76,6 +93,30 @@ enum class PlayerControlsAction {
     DoubleTapSeekBack,
     DoubleTapSeekForward,
 }
+
+data class PlayerControlSubtitleFont(
+    val id: String,
+    val label: String,
+)
+
+data class PlayerControlChapter(
+    val startMs: Long,
+    val title: String,
+)
+
+data class PlayerControlInfoItem(
+    val label: String,
+    val value: String,
+)
+
+data class PlayerControlInfoSection(
+    val title: String,
+    val logo: String? = null,
+    val name: String? = null,
+    val subtitle: String? = null,
+    val description: String? = null,
+    val items: List<PlayerControlInfoItem> = emptyList(),
+)
 
 data class PlayerControlsState(
     val title: String = "",
@@ -147,7 +188,6 @@ data class PlayerControlsState(
     val subtitleBuiltInTabLabel: String = "Built-in",
     val subtitleAddonsTabLabel: String = "Addons",
     val subtitleStyleTabLabel: String = "Style",
-    val customSubtitleStyleLabel: String = "Use custom styling",
     val forcedLabel: String = "Forced",
     val noneLabel: String = "None",
     val fetchSubtitlesLabel: String = "Tap to fetch subtitles",
@@ -165,6 +205,19 @@ data class PlayerControlsState(
     val colorLabel: String = "Color",
     val textOpacityLabel: String = "Text Opacity",
     val outlineColorLabel: String = "Outline Color",
+    val fontLabel: String = "Font",
+    val backgroundColorLabel: String = "Background Color",
+    val backgroundOpacityLabel: String = "Background opacity",
+    val fontImportLabel: String = "Import font",
+    val fontImportHint: String = "",
+    val fontImportError: String = "",
+    val doneLabel: String = "Done",
+    val fontRemoveLabel: String = "Remove {name}",
+    val subtitleFontImportFailed: Boolean = false,
+    val shadowLabel: String = "Drop shadow",
+    val shadowOpacityLabel: String = "Shadow opacity",
+    val shadowSizeLabel: String = "Shadow size",
+    val subtitleFonts: List<PlayerControlSubtitleFont> = emptyList(),
     val noSubtitleLinesFoundLabel: String = "No subtitle lines found",
     val resetDefaultsLabel: String = "Reset Defaults",
     val onLabel: String = "On",
@@ -250,7 +303,6 @@ data class PlayerControlsState(
     val isLoadingAddonSubtitles: Boolean = false,
     val selectedAddonSubtitleId: String = "",
     val useCustomSubtitles: Boolean = false,
-    val customSubtitleStylingEnabled: Boolean = true,
     val subtitleStyle: SubtitleStyleState = SubtitleStyleState.DEFAULT,
     val subtitleDelayMs: Int = 0,
     val hasSelectedAddonSubtitle: Boolean = false,
@@ -265,6 +317,14 @@ data class PlayerControlsState(
     val notificationToken: Long = 0L,
     val party: PlayerControlPartyState = PlayerControlPartyState(),
     val badges: List<StreamBadge> = emptyList(),
+    val chapters: List<PlayerControlChapter> = emptyList(),
+    val chapterTitleEnabled: Boolean = true,
+    val chaptersLabel: String = "Chapters",
+    val chaptersPanelTitle: String = "Chapters",
+    val chapterRemainingTemplate: String = "{time} left",
+    val autoSyncedLabel: String = "Auto synced",
+    val streamInfoLabel: String = "Stream info",
+    val streamInfoSections: List<PlayerControlInfoSection> = emptyList(),
 )
 
 data class PlayerControlFilterItem(
@@ -344,6 +404,7 @@ data class PlayerControlSubtitleOptionItem(
     val title: String = "",
     val metadata: String = "",
     val isSelected: Boolean = false,
+    val isAutoSynced: Boolean = false,
 )
 
 data class PlayerControlSubtitleCueItem(
