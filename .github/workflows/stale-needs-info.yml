@@ -10,6 +10,9 @@ permissions:
 
 jobs:
   close_stale:
+    # Inherited upstream automation. In the ARM64 fork it would close or relabel the
+    # fork's own sync/candidate records, or publish upstream store sources.
+    if: github.repository == 'NuvioMedia/NuvioDesktop'
     runs-on: ubuntu-latest
     steps:
       - name: Close inactive needs-info bug issues

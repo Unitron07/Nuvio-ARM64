@@ -28,6 +28,9 @@ concurrency:
 
 jobs:
   update:
+    # Inherited upstream automation. In the ARM64 fork it would close or relabel the
+    # fork's own sync/candidate records, or publish upstream store sources.
+    if: github.repository == 'NuvioMedia/NuvioDesktop'
     name: Update sideload sources
     runs-on: ubuntu-latest
     env:
