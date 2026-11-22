@@ -66,6 +66,22 @@ class ApiTests(unittest.TestCase):
         d.upsert_issue(api, "test/repo", "marker", "title", "body")
         api.request.assert_not_called()
 
+    def test_new_bot_issue_is_created_with_labels(self):
+        api = Mock()
+        api.pages.return_value = []
+        d.upsert_issue(api, "test/repo", "marker", "title", "body", labels=["arm64-candidate"])
+        api.request.assert_called_once_with("POST", "repos/test/repo/issues",
+            {"title": "title", "body": "marker\nbody", "labels": ["arm64-candidate"]})
+
+    def test_existing_unlabeled_record_gets_missing_labels_only(self):
+        api = Mock()
+        api.pages.return_value = [{"number": 2, "body": "marker\nbody", "state": "closed",
+                                   "labels": [{"name": "keep"}]}]
+        d.upsert_issue(api, "test/repo", "marker", "title", "body", labels=["keep", "upstream-sync"])
+        # Labels are added, but the closed record is not reopened or rewritten.
+        api.request.assert_called_once_with("POST", "repos/test/repo/issues/2/labels",
+                                            {"labels": ["upstream-sync"]})
+
 
 class SyncTests(unittest.TestCase):
     def setUp(self):
@@ -138,6 +154,7 @@ class SyncTests(unittest.TestCase):
         self.assertIn("file.kt", issue.call_args.args[-1])
         # A single rolling issue, reopened when a previous blockage was closed.
         self.assertEqual(issue.call_args.args[2], d.CONFLICT_MARKER)
+        self.assertEqual(issue.call_args.kwargs["labels"], ["upstream-sync"])
         self.api.request.assert_any_call("PATCH", "repos/test/repo/issues/3", {"state": "open"})
 
     @patch.object(d, "ancestry", return_value=False)
@@ -200,6 +217,7 @@ class MonitorTests(unittest.TestCase):
             with patch.object(d, "upsert_issue", return_value={"number": 9, "body": "candidate", "html_url": "candidate"}) as issue:
                 d.monitor(api, "test/repo", "up/repo", "")
             self.assertIn("**False**", issue.call_args.args[-1])
+            self.assertEqual(issue.call_args.kwargs["labels"], ["arm64-candidate"])
             dispatch = next(c for c in api.request.call_args_list if c.args[0] == "POST")
             self.assertIn("upstream-sync.yml/dispatches", dispatch.args[1])
             self.assertEqual(dispatch.args[2]["inputs"]["upstream_tag"], release["tag_name"])

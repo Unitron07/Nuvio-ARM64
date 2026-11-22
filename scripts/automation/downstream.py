@@ -96,11 +96,16 @@ def summary(message):
             out.write(message + "\n")
 
 
-def upsert_issue(api, repo, marker, title, body):
+def upsert_issue(api, repo, marker, title, body, labels=()):
     issues = api.pages(f"repos/{repo}/issues?state=all&creator=github-actions%5Bbot%5D")
     found = next((i for i in issues if not i.get("pull_request") and marker in (i.get("body") or "")), None)
     payload = {"title": title, "body": marker + "\n" + body}
     if found:
+        # Labelled records are also skipped by unlabeled-issue triage if it ever runs here.
+        present = {l["name"] for l in found.get("labels") or []}
+        missing = [l for l in labels if l not in present]
+        if missing:
+            api.request("POST", f"repos/{repo}/issues/{found['number']}/labels", {"labels": missing})
         # Preserve successful dispatch receipts across later ancestry/body refreshes.
         for receipt in re.findall(r"<!-- sync-dispatched:[0-9a-f]{40} -->", found.get("body") or ""):
             payload["body"] += "\n" + receipt
@@ -108,6 +113,8 @@ def upsert_issue(api, repo, marker, title, body):
         if found["body"] != payload["body"]:
             api.request("PATCH", f"repos/{repo}/issues/{found['number']}", payload)
         return found | {"body": payload["body"]}
+    if labels:
+        payload["labels"] = list(labels)
     return api.request("POST", f"repos/{repo}/issues", payload)
 
 
@@ -181,7 +188,7 @@ def sync(api, repo, upstream, branch, tag=""):
                         body + f"\nLatest attempt: `{candidate}` (no integration commit created).\n\n"
                         f"{report}\nResolve locally: merge `{candidate}` into main, then run "
                         "`python scripts/automation/conflict_rules.py` to apply the automatic rules "
-                        "and finish the files marked manual.\n")
+                        "and finish the files marked manual.\n", labels=["upstream-sync"])
                     if issue.get("state") == "closed":
                         api.request("PATCH", f"repos/{repo}/issues/{issue['number']}", {"state": "open"})
                     summary(issue["html_url"])
@@ -241,7 +248,8 @@ def monitor(api, repo, upstream, tag):
                 "Public gates: native license/corresponding-source closure, credential-at-rest decision, "
                 "Surface install/upgrade/uninstall and profile preservation, signing/trust decision. "
                 "Deleted/replaced releases do not delete this audit record; changed tags create a new identity.\n")
-        issue = upsert_issue(api, repo, marker, f"ARM64 candidate: {release['tag_name']} ({identity['key']})", body)
+        issue = upsert_issue(api, repo, marker, f"ARM64 candidate: {release['tag_name']} ({identity['key']})", body,
+                             labels=["arm64-candidate"])
         receipt = f"<!-- sync-dispatched:{source} -->"
         if not integrated and issue.get("state") != "closed" and receipt not in (issue.get("body") or ""):
             api.request("POST", f"repos/{repo}/actions/workflows/upstream-sync.yml/dispatches",
@@ -269,11 +277,11 @@ def main():
         raise RuntimeError("Automation is restricted to the downstream repository")
     validate_repo(args.upstream)
     api = GitHub()
+    # Labels are idempotent and never execute a fetched script.
+    for label, color in (("upstream-sync", "0366d6"), ("auto-resolved", "fbca04"), ("arm64-candidate", "5319e7")):
+        if api.request("GET", f"repos/{repo}/labels/{label}", missing=True) is None:
+            api.request("POST", f"repos/{repo}/labels", {"name": label, "color": color})
     if args.command == "sync":
-        # Label is idempotent and never executes a fetched script.
-        for label, color in (("upstream-sync", "0366d6"), ("auto-resolved", "fbca04")):
-            if api.request("GET", f"repos/{repo}/labels/{label}", missing=True) is None:
-                api.request("POST", f"repos/{repo}/labels", {"name": label, "color": color})
         sync(api, repo, args.upstream, args.branch, args.tag)
     else:
         monitor(api, repo, args.upstream, args.tag)
