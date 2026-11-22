@@ -157,7 +157,7 @@ def sync(api, repo, upstream, branch, tag=""):
             f"Commits:\n```text\n{commits[:18000]}\n```\nFiles:\n```text\n{files[:12000]}\n```\n\n"
             "ARM64 risk review: native JNI/libmpv/Skiko/WebView2 and lifecycle; D3D11VA/fallback; "
             "headers/addons/debrid; touch/scroll/menu/sidebar/cache; auth/sync/resume/profile isolation; "
-            "x64 and shared mobile code; unsupported P2P guard. See STAGE6_SURFACE_VALIDATION.md.\n\n"
+            "x64 and shared mobile code; unsupported P2P guard. See docs/arm64/STAGE6_SURFACE_VALIDATION.md.\n\n"
             f"Validation: https://github.com/{repo}/actions/workflows/upstream-validation.yml\n"
             "Inspect matching SHA checks and perform Surface tests. Never auto-merge.\n")
     if not existing:

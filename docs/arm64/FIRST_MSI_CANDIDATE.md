@@ -107,7 +107,7 @@ claimed in this preparation PR. Source integration is satisfied for the chosen
 basis; ledger merge and owner environment approval are the remaining build gates.
 
 Exact decrypt/install/uninstall/rollback and second-candidate instructions are in
-[scripts/windows/stage6/FIRST_MSI_SURFACE_TEST.md](scripts/windows/stage6/FIRST_MSI_SURFACE_TEST.md).
+[scripts/windows/stage6/FIRST_MSI_SURFACE_TEST.md](../../scripts/windows/stage6/FIRST_MSI_SURFACE_TEST.md).
 Preserve the local private key separately; never put it in the GitHub PR or test
 results. Public legal/security/trust and real hardware installation gates remain
 open. No public release or successful physical installation is claimed.

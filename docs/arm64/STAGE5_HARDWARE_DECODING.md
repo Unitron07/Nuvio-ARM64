@@ -13,7 +13,7 @@ on Surface Pro 11 / Snapdragon X / Windows ARM64, using the privacy-safe diagnos
 The owner supplied stage5-safe-results.json and stage3-owner-results.zip during
 finalization. Their aggregate JSON and generated application-session manifest were
 independently inspected; source/architecture/exit/crash fields and the figures below
-agree with the owner's summary. [Sanitized owner evidence and input hashes](docs/stage5/owner-surface-results.json)
+agree with the owner's summary. [Sanitized owner evidence and input hashes](../../docs/stage5/owner-surface-results.json)
 preserve provenance. Raw per-sample playback logs were not supplied or recalculated;
 hardware playback was not repeated during finalization. Private profiles, media
 identifiers and raw archives are not committed. The archive's legacy checklist remains
@@ -135,7 +135,7 @@ On this Microsoft Surface Pro 11, Snapdragon X1P64100, Qualcomm Adreno X1-85 dri
 the pinned libmpv DLL (SHA256 `f90cee7e3dbb0a12fbfa6b95af1fb2bb22dbfebf8422efc0324918ee75661850`)
 reported **d3d11va during progressing playback for all eight generated codec/resolution
 cases** below. This is actual runtime decoder evidence, not an option/availability
-inference. [Sanitized conditions, hashes and interval summaries](docs/stage5/standalone-surface-results.json)
+inference. [Sanitized conditions, hashes and interval summaries](../../docs/stage5/standalone-surface-results.json)
 identify the exact probe source commit.
 
 | Synthetic SDR 8-bit 4:2:0, approximately 30 fps | 1080p | 3840x2160 |

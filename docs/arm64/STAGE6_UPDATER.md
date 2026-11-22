@@ -14,11 +14,13 @@ not inferred from README links. Original download did not verify checksums.
 
 ## Windows ARM64 policy
 
-A native aarch64/arm64 JVM on Windows selects Unitron07/Nuvio-ARM64. Other
-platforms retain their upstream release source and distribution behavior. An x64
-JVM running under Windows ARM emulation remains the x64 distribution; this does
-not constitute a native ARM64 install. Unsupported Windows JVM architectures do
-not enable updates.
+The release source is fixed when the package is built, not chosen from the
+runtime CPU. Fork builds (`isForkWindowsArm64` in `composeApp/build.gradle.kts`,
+generated as `AppVersionConfig.DESKTOP_FORK_WINDOWS_ARM64`) query only
+Unitron07/Nuvio-ARM64 and never install automatically. Upstream builds keep
+NuvioMedia/NuvioDesktop and its distribution behavior. A fork build running on
+an x64 or emulated JVM therefore can no longer be offered upstream's x64 MSI
+(PR #83; see `DesktopReleaseSourceTest`).
 
 ARM64 fetches the first 100 releases for all channels, with semantic sorting
 rather than relying on latest/publication order. Stable excludes GitHub previews

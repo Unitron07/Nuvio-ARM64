@@ -19,7 +19,7 @@ near 23.976 FPS reported auto requested / d3d11va active across 40 qualifying
 intervals from 57 playback samples. This is initial stability/hardware evidence,
 not an endurance result. The supplied aggregate JSON and application-session manifest
 were independently inspected: duration 311.70 seconds, matching source/architecture,
-exit/crash/error values and metrics. [Sanitized evidence/input hashes](docs/stage5/owner-surface-results.json)
+exit/crash/error values and metrics. [Sanitized evidence/input hashes](../../docs/stage5/owner-surface-results.json)
 are committed; raw archives, private paths and media/account identifiers are excluded.
 The legacy archive checklist is still pending; the owner's explicit narrower
 milestone acceptance is separate. Raw per-sample telemetry was not reprocessed and
