@@ -35,8 +35,9 @@ private val desktopUpdaterHttpClient: HttpClient = HttpClient.newBuilder()
 
 actual object AppUpdaterPlatform {
     private val currentOs: DesktopUpdaterOs = DesktopUpdaterOs.current()
-    private val forkArm64 = currentOs == DesktopUpdaterOs.WINDOWS &&
-        System.getProperty("os.arch").lowercase(Locale.ROOT) in listOf("aarch64", "arm64")
+    // Decided by the package, not the CPU: a fork build must never query or install
+    // upstream releases, even when its code runs on an x64 or emulated JVM.
+    private val forkArm64 = AppVersionConfig.DESKTOP_FORK_WINDOWS_ARM64
     private val store = DesktopStorage.store(if (forkArm64) "nuvio_arm64_updater" else desktopUpdaterPreferencesName)
     actual val isDebugBuild: Boolean = false
     actual val hasSingleUpdateChannel: Boolean = !forkArm64
@@ -56,16 +57,7 @@ actual object AppUpdaterPlatform {
             (currentOs != DesktopUpdaterOs.WINDOWS ||
                 System.getProperty("os.arch").lowercase(Locale.ROOT) in listOf("arm64", "aarch64", "x64", "amd64", "x86_64"))
 
-    actual val releaseSource: AppUpdateReleaseSource = if (forkArm64) AppUpdateReleaseSource(
-        owner = "Unitron07", repo = "Nuvio-ARM64", includePrereleases = true,
-        userAgent = "Nuvio-ARM64", forkArm64 = true,
-    ) else AppUpdateReleaseSource(
-        owner = "NuvioMedia",
-        repo = "NuvioDesktop",
-        channelBranch = null,
-        includePrereleases = true,
-        userAgent = "NuvioDesktop",
-    )
+    actual val releaseSource: AppUpdateReleaseSource = desktopReleaseSource(forkArm64)
 
     actual val assetSelector: AppUpdateAssetSelector
         get() = currentOs.assetSelector(linuxInstallMethod)
@@ -378,3 +370,15 @@ internal fun appImageReplaceScript(
 }
 
 private fun singleQuote(value: String): String = "'" + value.replace("'", "'\\''") + "'"
+
+/** Releases are discovered only from the repository that produced this package. */
+internal fun desktopReleaseSource(forkBuild: Boolean): AppUpdateReleaseSource = if (forkBuild) AppUpdateReleaseSource(
+    owner = "Unitron07", repo = "Nuvio-ARM64", includePrereleases = true,
+    userAgent = "Nuvio-ARM64", forkArm64 = true,
+) else AppUpdateReleaseSource(
+    owner = "NuvioMedia",
+    repo = "NuvioDesktop",
+    channelBranch = null,
+    includePrereleases = true,
+    userAgent = "NuvioDesktop",
+)
