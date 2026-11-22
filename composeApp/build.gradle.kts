@@ -46,6 +46,9 @@ abstract class GenerateRuntimeConfigsTask : DefaultTask() {
     abstract val desktopAppVersionCode: Property<Int>
 
     @get:Input
+    abstract val desktopForkWindowsArm64: Property<Boolean>
+
+    @get:Input
     abstract val supabaseUrl: Property<String>
 
     @get:Input
@@ -222,6 +225,8 @@ abstract class GenerateRuntimeConfigsTask : DefaultTask() {
                 |    const val VERSION_CODE = ${appVersionCode.get()}
                 |    const val DESKTOP_VERSION_NAME = "${desktopAppVersionName.get()}"
                 |    const val DESKTOP_VERSION_CODE = ${desktopAppVersionCode.get()}
+                |    // True only for the Nuvio-ARM64 fork package (built on Windows ARM64).
+                |    const val DESKTOP_FORK_WINDOWS_ARM64 = ${desktopForkWindowsArm64.get()}
                 |}
                 """.trimMargin()
             )
@@ -571,6 +576,7 @@ val generateRuntimeConfigs = tasks.register<GenerateRuntimeConfigsTask>("generat
     appVersionCode.set(releaseAppVersionCode)
     desktopAppVersionName.set(desktopReleaseVersionName)
     desktopAppVersionCode.set(desktopReleaseVersionCode)
+    desktopForkWindowsArm64.set(isForkWindowsArm64)
     supabaseUrl.set(runtimeConfigValue("NUVIO_SUPABASE_URL"))
     supabaseAnonKey.set(runtimeConfigValue("NUVIO_SUPABASE_ANON_KEY"))
     supabaseFallbackUrl.set(runtimeConfigValue("NUVIO_SUPABASE_FALLBACK_URL"))
