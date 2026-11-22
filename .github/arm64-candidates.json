@@ -7,5 +7,14 @@
     "revision": 1,
     "package_sequence": 1,
     "delivery_recipient": "age12yrxaa67csgxu5cp662yjc4y4h8m9pl40qjy6nktcdr4l3vjt9es9jrqpu"
+  },
+  "alpha38-r1": {
+    "release_id": 451361924,
+    "upstream_tag": "0.1.38-alpha",
+    "upstream_sha": "35bdb2a77ca86b4141588832a3fc3ca0c80bfc4d",
+    "downstream_sha": "2ac46754b4ad4a6a70d3322e2db0bcb427901a9e",
+    "revision": 1,
+    "package_sequence": 2,
+    "delivery_recipient": "age12yrxaa67csgxu5cp662yjc4y4h8m9pl40qjy6nktcdr4l3vjt9es9jrqpu"
   }
 }
