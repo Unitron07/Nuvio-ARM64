@@ -1,21 +1,63 @@
-# Nuvio-ARM64 downstream fork
+# Nuvio-ARM64
 
-Native Windows ARM64 work for Surface Pro 11 / Snapdragon X, based on
-[Nuvio Desktop](https://github.com/NuvioMedia/NuvioDesktop). Upstream attribution
-and GPLv3 licensing are retained below.
+A native Windows on ARM build of [Nuvio Desktop](https://github.com/NuvioMedia/NuvioDesktop)
+for Snapdragon X PCs such as the Surface Pro 11. It follows upstream closely and
+changes only what Windows ARM64 needs. This is an unofficial fork: report ARM64
+problems [here](https://github.com/Unitron07/Nuvio-ARM64/issues), not upstream.
 
-**ARM64 users:** use this fork's validated CI development artifacts and
-[fork releases](https://github.com/Unitron07/Nuvio-ARM64/releases) when approved.
-The upstream Windows MSI is x64 and is not the native ARM64 package. No public
-ARM64 installer is claimed ready. Stage 6 adds review-only upstream automation,
-experimental internal packaging and informational fork update discovery.
+Upstream's Windows MSI is x64 only and runs under emulation on ARM. This fork ships
+a native ARM64 app: ARM64 JDK, libmpv/FFmpeg, QuickJS JNI bridge, Skiko and
+WebView2 player bridge.
 
-See [sync design](STAGE6_UPSTREAM_SYNC.md), [candidate and release gates](STAGE6_ARM64_RELEASES.md),
-[updater policy](STAGE6_UPDATER.md), and [isolated Surface validation](STAGE6_SURFACE_VALIDATION.md).
-Public release and automatic installation remain blocked pending licensing,
-security, signing/trust decisions and physical installer evidence.
+## Install
+
+1. Download `Nuvio-ARM64-Windows-arm64-<version>.msi` from
+   [Releases](https://github.com/Unitron07/Nuvio-ARM64/releases).
+2. Check the file against the SHA-256 published with the release:
+   `Get-FileHash .\Nuvio-ARM64-Windows-arm64-<version>.msi`.
+3. Run the MSI. It installs for the current user only.
+
+The package is **not code-signed**, so SmartScreen will warn on first run
+(**More info → Run anyway**). It installs as `Nuvio-ARM64`, separately from
+official Nuvio, but both use the same `%APPDATA%\Nuvio` profile. Don't run the two
+at the same time.
+
+## Updates
+
+The in-app update check looks only at this repository's releases and tells you
+when a newer ARM64 build is available. It never installs automatically; download
+the new MSI and run it over the old one. Versions look like `0.1.38-alpha+arm64.1`:
+the upstream version, then the fork revision.
+
+## What's different from upstream
+
+- Native Windows ARM64 runtime and MSI packaging (jpackage + WiX), with its own
+  install identity.
+- Touch: drag-to-scroll with momentum on lists, grids, shelves and menus.
+- ARM64 media runtime and player diagnostics, validated on a Surface Pro 11.
+- Automation that proposes upstream merges every six hours and resolves routine
+  conflicts ([how it works](docs/arm64/STAGE6_UPSTREAM_SYNC.md)).
+
+## Status and known limits
+
+Alpha, like upstream. Builds are unsigned. Licensing review of the bundled native
+dependencies (libmpv, FFmpeg) and the credential-storage review are still open;
+see [release gates](docs/arm64/STAGE6_ARM64_RELEASES.md#public-release-blockers-all-open).
+Open follow-ups are tracked in [issues](https://github.com/Unitron07/Nuvio-ARM64/issues).
+
+## Build from source on Windows ARM64
+
+You need an ARM64 JDK 21, MSVC ARM64 tools, the Windows SDK, the WebView2 SDK and
+ARM64 builds of libmpv and the QuickJS JNI bridge. See
+[build preparation](docs/arm64/WINDOWS_ARM64_SURFACE.md#build-preparation).
+Release packages come from the `windows-arm64-release.yml` workflow
+([procedure](docs/arm64/STAGE6_ARM64_RELEASES.md#controlled-build-procedure)).
+
+All fork design notes and validation records are in [docs/arm64](docs/arm64/README.md).
 
 ---
+
+*The rest of this README is upstream's, unchanged.*
 
 <div align="center">
 
@@ -39,7 +81,7 @@ Expect breaking changes with every update. Features, settings, stored data, and 
 
 ## Get Nuvio Desktop
 
-**Other platforms / official upstream builds:** download from [GitHub Releases](https://github.com/NuvioMedia/NuvioDesktop/releases/latest).
+Download the latest build from [GitHub Releases](https://github.com/NuvioMedia/NuvioDesktop/releases/latest).
 
 - Windows: MSI installer
 - macOS: DMG installer
@@ -93,21 +135,6 @@ Linux:
 ```
 
 The shared app is built with Kotlin Multiplatform and Compose Multiplatform.
-
-## Windows ARM64 development
-
-**Core touchscreen UX validated on Surface Pro 11 — ready for merge, subject to final checks.**
-See the [Stage 4 final validation ledger](STAGE4_FINAL_VALIDATION.md) for owner-reported
-touchscreen results, bounded artwork caching, A/B observations and remaining limits.
-PR #9 is prepared for owner review; it is not merged and no release is published.
-
-Stage 3 PR #4 is merged: native ARM64 launch,
-local addons, account sign-in/synchronization and real debrid playback are
-owner-confirmed on Surface Pro 11. Automated checks and owner reports are recorded
-separately; remaining hardening work is in the
-[Stage 4 roadmap](STAGE4_ROADMAP.md). See the
-[ARM64 build notes](WINDOWS_ARM64_SURFACE.md) and
-[Stage 3 tests, evidence and Surface owner procedure](STAGE3_ARM64_VALIDATION.md).
 
 ## License
 

@@ -12,7 +12,7 @@ Copy-Item -LiteralPath $PSScriptRoot -Destination (Join-Path $output 'scripts/wi
 [ordered]@{schema='nuvio-stage5-tools-v1'; sourceCommit=$SourceCommit; architecture='arm64'} |
     ConvertTo-Json | Set-Content -LiteralPath (Join-Path $output 'scripts/windows/stage5/SOURCE.json')
 foreach ($name in @('STAGE5_ARM64_PERFORMANCE.md','STAGE5_HARDWARE_DECODING.md','STAGE5_SURFACE_VALIDATION.md')) {
-    Copy-Item -LiteralPath (Join-Path $repo $name) -Destination $output
+    Copy-Item -LiteralPath (Join-Path $repo "docs/arm64/$name") -Destination $output
 }
 New-Item -ItemType Directory -Force (Join-Path $output 'docs/stage5') | Out-Null
 Copy-Item -LiteralPath "$repo/docs/stage5/standalone-surface-results.json" -Destination (Join-Path $output 'docs/stage5')

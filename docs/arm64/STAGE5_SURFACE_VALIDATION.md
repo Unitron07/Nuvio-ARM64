@@ -13,7 +13,7 @@ The owner tested matching Stage 5 ARM64 image/tools at
 stage3-owner-results.zip were independently inspected during finalization. The
 aggregate JSON and generated application-session manifest agree with the owner
 summary; measured duration is 311.70 seconds (approximately five minutes twelve
-seconds). [Sanitized numeric evidence/input hashes](docs/stage5/owner-surface-results.json)
+seconds). [Sanitized numeric evidence/input hashes](../../docs/stage5/owner-surface-results.json)
 are committed. Raw per-sample telemetry was not supplied/recalculated and hardware
 testing was not repeated. The legacy archive checklist is still pending; explicit
 owner acceptance of the narrower milestone is recorded separately. Keep private
