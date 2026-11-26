@@ -125,6 +125,31 @@ def ancestry(older, newer, cwd=None):
     return result.returncode == 0
 
 
+SYNC_PREFIX = "automation/upstream-"
+
+
+def close_superseded(api, repo, new_number, candidate):
+    """Close older bot sync drafts whose whole candidate is contained in the new proposal."""
+    for pr in api.pages(f"repos/{repo}/pulls?state=open&base=main"):
+        ref = pr["head"]["ref"]
+        old = ref[len(SYNC_PREFIX):]
+        # Only untouched bot drafts from this repository; a PR the owner marked ready stays open.
+        if (pr["number"] == new_number or not ref.startswith(SYNC_PREFIX) or not pr.get("draft")
+                or (pr.get("user") or {}).get("login") != "github-actions[bot]"
+                or ((pr["head"].get("repo") or {}).get("full_name")) != repo
+                or not re.fullmatch("[0-9a-f]{40}", old) or old == candidate):
+            continue
+        try:
+            contained = ancestry(old, candidate)
+        except RuntimeError:
+            continue  # Unknown history (e.g. a tag lineage not fetched here): leave it for the owner.
+        if contained:
+            api.request("POST", f"repos/{repo}/issues/{pr['number']}/comments",
+                        {"body": f"Superseded by #{new_number}, which contains every commit in this proposal."})
+            api.request("PATCH", f"repos/{repo}/pulls/{pr['number']}", {"state": "closed"})
+            summary(f"Closed superseded {pr['html_url']}")
+
+
 def sync(api, repo, upstream, branch, tag=""):
     validate_repo(upstream)
     if tag:
@@ -142,7 +167,7 @@ def sync(api, repo, upstream, branch, tag=""):
     if ancestry(candidate, base):
         summary(f"No upstream changes: {candidate} is integrated.")
         return
-    name = f"automation/upstream-{candidate}"
+    name = f"{SYNC_PREFIX}{candidate}"
     prs = api.pages(f"repos/{repo}/pulls?state=all&head={repo.split('/')[0]}:{name}&base=main")
     existing = next(iter(prs), None)
     if existing and existing["state"] == "closed":
@@ -208,6 +233,7 @@ def sync(api, repo, upstream, branch, tag=""):
             "body": body + (resolution or "\nMerge conflict status: clean at creation.\n")})
         labels = ["upstream-sync"] + (["auto-resolved"] if resolution else [])
         api.request("POST", f"repos/{repo}/issues/{existing['number']}/labels", {"labels": labels})
+        close_superseded(api, repo, existing["number"], candidate)
     # Existing bot branches are immutable. Dispatch exact PR head through a trusted
     # default-branch workflow; GITHUB_TOKEN push/PR events alone are insufficient.
     if not existing["draft"]:

@@ -86,7 +86,8 @@ class ApiTests(unittest.TestCase):
 class SyncTests(unittest.TestCase):
     def setUp(self):
         self.api = Mock()
-        self.api.pages.side_effect = [[], [RELEASE]]
+        # Existing head PR, upstream releases, then open PRs scanned for superseded proposals.
+        self.api.pages.side_effect = [[], [RELEASE], []]
         self.api.request.return_value = {"number": 7, "html_url": "https://example/pr/7", "draft": True,
                                          "head": {"sha": SHA}}
 
@@ -186,6 +187,46 @@ class SyncTests(unittest.TestCase):
             with self.assertRaisesRegex(RuntimeError, "main moved"):
                 d.sync(self.api, "test/repo", "up/repo", "Dev")
         self.assertFalse(any(c.args[0] == "push" for c in git.call_args_list))
+
+
+class SupersedeTests(unittest.TestCase):
+    OLD, OTHER = "1" * 40, "2" * 40
+
+    def pr(self, number, sha, draft=True, user="github-actions[bot]", repo="test/repo", prefix=d.SYNC_PREFIX):
+        return {"number": number, "draft": draft, "html_url": f"pr/{number}", "user": {"login": user},
+                "head": {"ref": prefix + sha, "repo": {"full_name": repo}}}
+
+    def closed(self, api):
+        return [c.args[1] for c in api.request.call_args_list if c.args[0] == "PATCH"]
+
+    def test_contained_bot_drafts_are_closed_with_a_pointer(self):
+        api = Mock()
+        api.pages.return_value = [self.pr(5, self.OLD), self.pr(9, SHA)]
+        with patch.object(d, "ancestry", return_value=True):
+            d.close_superseded(api, "test/repo", 9, SHA)
+        self.assertEqual(self.closed(api), ["repos/test/repo/pulls/5"])
+        api.request.assert_any_call("POST", "repos/test/repo/issues/5/comments",
+            {"body": "Superseded by #9, which contains every commit in this proposal."})
+
+    def test_unrelated_owner_or_ready_prs_stay_open(self):
+        api = Mock()
+        api.pages.return_value = [
+            self.pr(1, self.OLD, draft=False),             # owner marked it ready
+            self.pr(2, self.OLD, user="Unitron07"),        # not the bot
+            self.pr(3, self.OLD, repo="someone/fork"),     # head from another repository
+            self.pr(4, self.OLD, prefix="feature/"),       # not a sync branch
+            self.pr(6, self.OTHER),                        # diverged lineage
+        ]
+        with patch.object(d, "ancestry", side_effect=lambda old, new: old != self.OTHER):
+            d.close_superseded(api, "test/repo", 9, SHA)
+        self.assertEqual(self.closed(api), [])
+
+    def test_unknown_history_is_left_for_the_owner(self):
+        api = Mock()
+        api.pages.return_value = [self.pr(5, self.OLD)]
+        with patch.object(d, "ancestry", side_effect=RuntimeError("Cannot determine source ancestry")):
+            d.close_superseded(api, "test/repo", 9, SHA)
+        api.request.assert_not_called()
 
 
 class MonitorTests(unittest.TestCase):
