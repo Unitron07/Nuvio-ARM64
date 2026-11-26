@@ -27,7 +27,6 @@ try {
         --tests 'com.nuvio.app.core.ui.DesktopVerticalDragScrollTest' `
         --tests 'com.nuvio.app.core.ui.StreamListTouchTest' `
         --tests 'com.nuvio.app.core.ui.ScrollDiagnosticsTest' `
-        --tests 'com.nuvio.app.core.ui.ScaledArtworkCacheTest' `
         --tests 'com.nuvio.app.core.ui.ShelfLifecycleTest' `
         --tests 'com.nuvio.app.core.ui.TouchCleanupTest' `
         --tests 'com.nuvio.app.core.storage.DesktopStorageTest' `

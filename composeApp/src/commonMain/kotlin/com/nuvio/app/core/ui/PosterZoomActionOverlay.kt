@@ -32,6 +32,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.AbsoluteAlignment
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -59,12 +60,19 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.max
 import androidx.compose.ui.unit.min
 import coil3.compose.AsyncImage
+import com.nuvio.app.controller.ControllerFocusEngine
+import com.nuvio.app.controller.ControllerFocusZone
+import com.nuvio.app.controller.ControllerManager
+import com.nuvio.app.controller.RegisterControllerHandler
+import com.nuvio.app.controller.controllerFocusable
 import dev.chrisbanes.haze.HazeInputScale
 import dev.chrisbanes.haze.HazeState
 import dev.chrisbanes.haze.hazeEffect
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withTimeoutOrNull
 
 /**
  * Geometry of the shelf card that was long-pressed, captured in root coordinates
@@ -203,12 +211,26 @@ fun NuvioPosterZoomActionOverlay(
         }
     }
 
+    // The preview menu is a spatial overlay (Overlay zone) even when it opens on a Compose-driven
+    // route (details). Let the engine drive it while it is visible, then restore the route mode.
+    DisposableEffect(Unit) {
+        val previous = ControllerFocusEngine.deferNavigationToCompose
+        ControllerFocusEngine.deferNavigationToCompose = false
+        onDispose { ControllerFocusEngine.deferNavigationToCompose = previous }
+    }
+
     DisposableEffect(source) {
+        source?.requestLiftCapture()
         onDispose { source?.land() }
     }
 
-    LaunchedEffect(slotBounds != null, phase) {
+    LaunchedEffect(slotBounds != null, phase, source) {
         if (slotBounds == null || phase != PosterZoomPhase.Open) return@LaunchedEffect
+        if (source != null && !source.isLiftCaptureReady) {
+            withTimeoutOrNull(120L) {
+                snapshotFlow { source.isLiftCaptureReady }.first { it }
+            }
+        }
         lifted = source?.lift() == true
         showFallback = !lifted
         launch { scrim.animateTo(1f, tween(durationMillis = 260, easing = NuvioTokens.Motion.standard)) }
@@ -250,6 +272,24 @@ fun NuvioPosterZoomActionOverlay(
         } else {
             close(afterClose = action.onSelected)
         }
+    }
+
+    // B closes the preview: the engine routes gamepad back through the global handler stack,
+    // so the Compose back handler above alone is not enough.
+    RegisterControllerHandler(
+        key = "poster_zoom_actions",
+        onBack = {
+            scope.launch { close() }
+            true
+        },
+    )
+
+    // When the preview is opened with the controller/keyboard, select its first action so A
+    // works immediately instead of leaving the ring behind on the poster.
+    LaunchedEffect(Unit) {
+        if (!ControllerManager.isNavigationActive.value) return@LaunchedEffect
+        delay(140)
+        ControllerFocusEngine.requestFocus("poster_action_0", triggerScroll = false)
     }
 
     PlatformBackHandler(enabled = true) {
@@ -377,6 +417,7 @@ fun NuvioPosterZoomActionOverlay(
                     }
                     PosterZoomMenuRow(
                         action = action,
+                        index = index,
                         enabled = phase == PosterZoomPhase.Open,
                         onSelected = { select(action) },
                         modifier = Modifier.graphicsLayer {
@@ -442,13 +483,13 @@ fun NuvioPosterZoomActionOverlay(
                 },
                 modifier = Modifier.fillMaxSize(),
             ) {
-                if (!showFallback && source != null) {
+                if (lifted && source != null) {
                     Box(
                         modifier = Modifier
                             .fillMaxSize()
                             .drawBehind { drawLiftedPoster(source) },
                     )
-                } else {
+                } else if (showFallback) {
                     Box(
                         modifier = Modifier
                             .fillMaxSize()
@@ -516,6 +557,7 @@ fun NuvioPosterZoomActionOverlay(
 @Composable
 private fun PosterZoomMenuRow(
     action: PosterZoomOverlayAction,
+    index: Int,
     enabled: Boolean,
     onSelected: () -> Unit,
     modifier: Modifier = Modifier,
@@ -526,6 +568,13 @@ private fun PosterZoomMenuRow(
         modifier = modifier
             .fillMaxWidth()
             .clickable(enabled = enabled, onClick = onSelected)
+            .controllerFocusable(
+                id = "poster_action_$index",
+                zone = ControllerFocusZone.Overlay,
+                groupKey = "poster_actions",
+                selectLabel = action.label,
+                onSelect = onSelected,
+            )
             .padding(horizontal = NuvioTokens.Space.s18, vertical = NuvioTokens.Space.s16),
         horizontalArrangement = Arrangement.spacedBy(NuvioTokens.Space.s12),
         verticalAlignment = Alignment.CenterVertically,

@@ -1,5 +1,11 @@
 # Vertical shelf scrolling: measured work and bounded scale reuse
 
+> **Superseded (upstream Dev `1ece6d7`, Nov 2026).** Upstream replaced the desktop
+> `ScaledBitmapPainter` with Coil decoding at the displayed size (cards 640 px, heroes
+> up to 2048 px). The shared 64 MiB scaled-artwork cache and `NUVIO_SHARED_ARTWORK_CACHE`
+> were removed with it; frame probes now report `cacheBudgetBytes: 0`. The A/B procedure
+> below applies only to builds before that merge.
+
 **Core touchscreen UX validated on Surface Pro 11 — ready for merge, subject to final checks.**
 
 [Final validation ledger](STAGE4_FINAL_VALIDATION.md) records the owner-reported A/B:

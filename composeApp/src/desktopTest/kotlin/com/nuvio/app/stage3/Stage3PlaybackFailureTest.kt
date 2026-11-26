@@ -39,18 +39,18 @@ class Stage3PlaybackFailureTest {
         try {
             attach(0)
             assertTrue(started[0].await(5, TimeUnit.SECONDS))
-            sinks[0]!!.onPlayerEvent("playbackError", -13.0)
+            sinks[0]!!.onPlayerEvent("mpvEndFileError", -13.0)
             assertTrue(reported[0].await(5, TimeUnit.SECONDS))
             attach(1)
-            sinks[0]!!.onPlayerEvent("playbackError", -13.0)
+            sinks[0]!!.onPlayerEvent("mpvEndFileError", -13.0)
             SwingUtilities.invokeAndWait {}
             assertEquals(1, errors.size)
             finish[0].countDown()
             assertTrue(started[1].await(5, TimeUnit.SECONDS))
-            sinks[1]!!.onPlayerEvent("playbackError", -13.0)
+            sinks[1]!!.onPlayerEvent("mpvEndFileError", -13.0)
             assertTrue(reported[1].await(5, TimeUnit.SECONDS))
             controller.releaseBeforeNavigation { released.countDown() }
-            sinks[1]!!.onPlayerEvent("playbackError", -13.0)
+            sinks[1]!!.onPlayerEvent("mpvEndFileError", -13.0)
             finish[1].countDown()
             assertTrue(released.await(5, TimeUnit.SECONDS))
             SwingUtilities.invokeAndWait {}

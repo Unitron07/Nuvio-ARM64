@@ -6,7 +6,9 @@ import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.gestures.Orientation
 import androidx.compose.foundation.hoverable
+import com.nuvio.app.core.ui.nuvioDesktopDragScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
@@ -27,7 +29,7 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.border
-import com.nuvio.app.core.ui.NuvioTouchLazyColumn as LazyColumn
+import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.ui.platform.testTag
 import androidx.compose.foundation.lazy.LazyListScope
 import androidx.compose.foundation.lazy.items
@@ -808,7 +810,10 @@ internal fun StreamList(
     Box(modifier = modifier.fillMaxWidth()) {
         LazyColumn(
             state = listState,
-            modifier = Modifier.fillMaxSize().testTag("stream-results-list"),
+            modifier = Modifier
+                .fillMaxSize()
+                .testTag("stream-results-list")
+                .nuvioDesktopDragScroll(listState, Orientation.Vertical),
             contentPadding = PaddingValues(
                 horizontal = 12.dp,
                 vertical = 12.dp,

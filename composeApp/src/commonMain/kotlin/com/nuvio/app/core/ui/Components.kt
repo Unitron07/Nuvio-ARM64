@@ -10,6 +10,7 @@ import androidx.compose.animation.slideOutVertically
 import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.gestures.Orientation
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -100,9 +101,9 @@ fun NuvioScreen(
             state = listState,
             modifier = Modifier
                 .fillMaxSize()
-                .nuvioDesktopVerticalDragScroll(listState)
+                .then(scrollViewportModifier)
                 .nuvioScrollFrameProbe(listState)
-                .then(scrollViewportModifier),
+                .nuvioDesktopDragScroll(listState, Orientation.Vertical),
             contentPadding = PaddingValues(
                 start = horizontalPadding,
                 top = topPadding ?: tokens.spacing.screenTop + statusBarTop + nuvioPlatformExtraTopPadding,
@@ -286,6 +287,9 @@ fun NuvioIconActionButton(
     val tokens = MaterialTheme.nuvio
     IconButton(
         modifier = modifier
+            // Compose focus moves between icon buttons on Compose-driven screens (settings,
+            // add-on manager); without a border the selection is invisible.
+            .nuvioFocusBorder(tokens.shapes.avatar)
             .background(
                 color = tokens.colors.background.copy(alpha = 0.001f),
                 shape = tokens.shapes.avatar,

@@ -30,7 +30,6 @@ import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.layout.statusBars
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.PaddingValues
-import com.nuvio.app.core.ui.nuvioDesktopVerticalDragScroll
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyListScope
 import androidx.compose.foundation.lazy.itemsIndexed
@@ -104,6 +103,7 @@ import com.nuvio.app.core.ui.PosterZoomAnchor
 import com.nuvio.app.core.ui.PosterZoomAnchorHolder
 import com.nuvio.app.core.ui.PosterZoomOverlayAction
 import com.nuvio.app.core.ui.desktopPageHorizontalPaddingForWidth
+import androidx.compose.foundation.gestures.Orientation
 import com.nuvio.app.core.ui.nuvioDesktopDragScroll
 import com.nuvio.app.core.ui.ScreenActivityEffect
 import com.nuvio.app.core.ui.TrackingListPickerDialog
@@ -1305,8 +1305,8 @@ fun MetaDetailsScreen(
                                 state = listState,
                                 modifier = Modifier
                                     .fillMaxSize()
-                                    .nuvioDesktopVerticalDragScroll(listState)
                                     .nestedScroll(heroStretchState.nestedScrollConnection)
+                                    .nuvioDesktopDragScroll(listState, Orientation.Vertical)
                                     .zIndex(1f),
                             ) {
                                 if (useDesktopDetailLayout) {

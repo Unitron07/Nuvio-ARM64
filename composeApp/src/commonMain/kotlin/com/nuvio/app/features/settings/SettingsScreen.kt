@@ -1,8 +1,16 @@
 package com.nuvio.app.features.settings
 
+import androidx.compose.runtime.key
+import androidx.compose.ui.focus.FocusDirection
+import androidx.compose.ui.platform.LocalFocusManager
+import com.nuvio.app.controller.ControllerFocusEngine
+import com.nuvio.app.controller.ControllerManager
 import com.nuvio.app.core.build.AppFeaturePolicy
+import com.nuvio.app.core.ui.FocusPresence
+import com.nuvio.app.core.ui.nuvioDesktopDragScroll
 import com.nuvio.app.isDesktop
 
+import androidx.compose.foundation.gestures.Orientation
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
@@ -19,7 +27,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.statusBars
 import androidx.compose.foundation.layout.width
-import com.nuvio.app.core.ui.NuvioTouchLazyColumn as LazyColumn
+import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.material3.HorizontalDivider
@@ -288,6 +296,18 @@ fun SettingsScreen(
         }
         val previousPage = page.previousPage()
 
+        // Settings sub-pages are Compose-driven; seed a focus target so arrows/Return work right
+        // after opening a page (previously there was no ring and Return did nothing).
+        val focusManager = LocalFocusManager.current
+        LaunchedEffect(page) {
+            if (ControllerFocusEngine.hasInteractiveContent) return@LaunchedEffect
+            if (!ControllerManager.isNavigationActive.value) return@LaunchedEffect
+            delay(200)
+            // Seed the new page's content even if the sidebar still holds focus, so Return works.
+            focusManager.clearFocus(force = true)
+            if (!ContentEntry.request()) focusManager.moveFocus(FocusDirection.Next)
+        }
+
         fun openPage(targetPage: SettingsPage) {
             if (!targetPage.isEnabledByPolicy()) return
             val externalNavigator = onNavigatePage
@@ -385,10 +405,14 @@ fun SettingsScreen(
             onRequestedPageConsumed()
         }
 
-        PlatformBackHandler(
-            enabled = screenActive && previousPage != null && (rootActionsEnabled || onExternalBack != null),
-            onBack = ::navigateBack,
-        )
+        // Re-register on every page change so the active page's handler is on top of the Escape
+        // stack (the row focus otherwise kept an older registration active).
+        key(page) {
+            PlatformBackHandler(
+                enabled = screenActive && previousPage != null && (rootActionsEnabled || onExternalBack != null),
+                onBack = ::navigateBack,
+            )
+        }
 
         if (isSelectedTab || page == SettingsPage.Root) {
             pageStateHolder.SaveableStateProvider("content") {
@@ -1032,7 +1056,8 @@ private fun TabletSettingsScreen(
                     state = listState,
                     modifier = Modifier
                         .fillMaxSize()
-                        .nestedScroll(rootSearchRevealConnection),
+                        .nestedScroll(rootSearchRevealConnection)
+                        .nuvioDesktopDragScroll(listState, Orientation.Vertical),
                     contentPadding = PaddingValues(
                         start = 40.dp,
                         top = topOffset,
