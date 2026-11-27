@@ -15,6 +15,7 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.Check
 import androidx.compose.material.icons.rounded.KeyboardArrowDown
@@ -27,6 +28,7 @@ import androidx.compose.material3.SheetState
 import androidx.compose.material3.Text
 import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -37,7 +39,13 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import com.nuvio.app.controller.ControllerFocusEngine
+import com.nuvio.app.controller.ControllerFocusZone
+import com.nuvio.app.controller.ControllerManager
+import com.nuvio.app.controller.RegisterControllerHandler
+import com.nuvio.app.controller.controllerFocusable
 import com.nuvio.app.isDesktop
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 
 data class NuvioDropdownOption(
@@ -55,6 +63,7 @@ fun NuvioDropdownChip(
     enabled: Boolean = true,
     onSelected: (NuvioDropdownOption) -> Unit,
     modifier: Modifier = Modifier,
+    focusId: String? = null,
     fillWidth: Boolean = false,
 ) {
     val tokens = MaterialTheme.nuvio
@@ -69,7 +78,16 @@ fun NuvioDropdownChip(
                 .background(tokens.colors.surface)
                 .then(
                     if (enabled) {
-                        Modifier.clickable { isSheetVisible = true }
+                        Modifier
+                            .clickable { isSheetVisible = true }
+                            .controllerFocusable(
+                                id = focusId ?: "dropdown_chip_$title",
+                                zone = ControllerFocusZone.Content,
+                                groupKey = "discover_filters",
+                                enabled = enabled,
+                                selectLabel = label,
+                                onSelect = { isSheetVisible = true },
+                            )
                     } else {
                         Modifier
                     },
@@ -105,8 +123,18 @@ fun NuvioDropdownChip(
                 containerColor = tokens.colors.surfacePopover,
                 shape = tokens.shapes.compactCard,
             ) {
-                options.forEach { option ->
+                options.forEachIndexed { index, option ->
                     DropdownMenuItem(
+                        modifier = Modifier.controllerFocusable(
+                            id = "dropdown_item_$index",
+                            zone = ControllerFocusZone.Overlay,
+                            groupKey = "dropdown_items",
+                            selectLabel = option.label,
+                            onSelect = {
+                                onSelected(option)
+                                isSheetVisible = false
+                            },
+                        ),
                         text = {
                             Text(
                                 text = option.label,
@@ -129,6 +157,23 @@ fun NuvioDropdownChip(
                             isSheetVisible = false
                         },
                     )
+                }
+            }
+
+            if (isSheetVisible) {
+                // B closes the popup and returns to the chip.
+                RegisterControllerHandler(
+                    key = "dropdown_menu",
+                    onBack = {
+                        isSheetVisible = false
+                        true
+                    },
+                )
+                LaunchedEffect(isSheetVisible, options) {
+                    if (!ControllerManager.isNavigationActive.value) return@LaunchedEffect
+                    delay(120)
+                    val selectedIndex = options.indexOfFirst { it.key == selectedKey }.coerceAtLeast(0)
+                    ControllerFocusEngine.requestFocus("dropdown_item_$selectedIndex", triggerScroll = false)
                 }
             }
         }
@@ -188,10 +233,13 @@ private fun NuvioDropdownOptionsSheet(
                 color = tokens.colors.textPrimary,
             )
             NuvioBottomSheetDivider()
+            val listState = rememberLazyListState()
             LazyColumn(
+                state = listState,
                 modifier = Modifier
                     .fillMaxWidth()
-                    .heightIn(max = tokens.breakpoints.largePhone),
+                    .heightIn(max = tokens.breakpoints.largePhone)
+                    .nuvioDesktopDragScroll(listState, Orientation.Vertical),
             ) {
                 items(options) { option ->
                     NuvioBottomSheetActionRow(

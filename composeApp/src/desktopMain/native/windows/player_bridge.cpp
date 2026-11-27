@@ -80,6 +80,15 @@ typedef enum mpv_event_id {
     MPV_EVENT_VIDEO_RECONFIG = 17,
 } mpv_event_id;
 
+typedef enum mpv_end_file_reason {
+    MPV_END_FILE_REASON_ERROR = 4,
+} mpv_end_file_reason;
+
+typedef struct mpv_event_end_file {
+    mpv_end_file_reason reason;
+    int error;
+} mpv_event_end_file;
+
 typedef struct mpv_event {
     mpv_event_id event_id;
     int error;
@@ -1458,7 +1467,8 @@ public:
         const std::string &font,
         const std::string &fontsDir,
         const std::string &shadowColor,
-        double shadowOffset
+        double shadowOffset,
+        double shadowBlur
     ) {
         if (!fontsDir.empty()) setStringProperty("sub-fonts-dir", fontsDir);
         setStringProperty("sub-font", font);
@@ -1466,6 +1476,7 @@ public:
         std::lock_guard<std::mutex> lock(mpvMutex);
         if (!mpv) return;
         mpvApi().setProperty(mpv, "sub-shadow-offset", MPV_FORMAT_DOUBLE, &shadowOffset);
+        mpvApi().setProperty(mpv, "sub-blur", MPV_FORMAT_DOUBLE, &shadowBlur);
     }
 
     void applySubtitleStyle(
@@ -1479,65 +1490,56 @@ public:
         bool useLibass,
         bool stripSdh
     ) {
-        double size = std::max(18.0, std::min(96.0, fontSize));
+        std::lock_guard<std::mutex> styleLock(subtitleStyleMutex);
+        double size = std::max(18.0, std::min(120.0, fontSize));
         int64_t position = std::max(0, std::min(150, subPos));
-        double scale = 1.0;
         double outline = std::max(0.0, std::min(8.0, outlineSize));
         std::string resolvedTextColor = textColor.empty() ? "#FFFFFFFF" : textColor;
         std::string resolvedBackgroundColor = backgroundColor.empty() ? "#00000000" : backgroundColor;
         std::string resolvedOutlineColor = outlineColor.empty() ? "#FF000000" : outlineColor;
 
-        bool modeChanged = !hasAppliedSubtitleStyle || appliedSubtitleUseLibass != useLibass;
-        bool sizeChanged = !hasAppliedSubtitleStyle || appliedSubtitleFontSize != size;
-        bool positionChanged = !hasAppliedSubtitleStyle || appliedSubtitlePosition != position;
-        bool boldChanged = !hasAppliedSubtitleStyle || appliedSubtitleBold != bold;
-        bool textColorChanged = !hasAppliedSubtitleStyle || appliedSubtitleTextColor != resolvedTextColor;
-        bool backgroundColorChanged =
-            !hasAppliedSubtitleStyle || appliedSubtitleBackgroundColor != resolvedBackgroundColor;
-        bool outlineColorChanged =
-            !hasAppliedSubtitleStyle || appliedSubtitleOutlineColor != resolvedOutlineColor;
-        bool outlineSizeChanged = !hasAppliedSubtitleStyle || appliedSubtitleOutlineSize != outline;
-        bool stripSdhChanged = !hasAppliedSubtitleStyle || appliedSubtitleStripSdh != stripSdh;
+        bool firstApply = !hasAppliedSubtitleStyle;
+        bool modeChanged = firstApply || appliedSubtitleUseLibass != useLibass;
+        bool sizeChanged = firstApply || appliedSubtitleFontSize != size;
+        bool boldChanged = firstApply || appliedSubtitleBold != bold;
+        bool textColorChanged = firstApply || appliedSubtitleTextColor != resolvedTextColor;
+        bool backgroundColorChanged = firstApply || appliedSubtitleBackgroundColor != resolvedBackgroundColor;
+        bool outlineColorChanged = firstApply || appliedSubtitleOutlineColor != resolvedOutlineColor;
+        bool outlineSizeChanged = firstApply || appliedSubtitleOutlineSize != outline;
+        bool stripSdhChanged = firstApply || appliedSubtitleStripSdh != stripSdh;
 
-        if (modeChanged) {
-            setStringProperty("sub-ass-override", "no");
-        }
-        if (modeChanged) {
+        appliedSubtitleUseLibass = useLibass;
+        appliedSubtitleBold = bold;
+        appliedSubtitleFontSize = size;
+        appliedSubtitleRawPosition = position;
+        hasAppliedSubtitleStyle = true;
+
+        bool assModeChanged = syncSubtitleTrackOverrideLocked(firstApply);
+
+        if (firstApply || sizeChanged || assModeChanged) {
             std::lock_guard<std::mutex> lock(mpvMutex);
             if (!mpv) return;
-            const char *styleOverridesCommand[] = {"change-list", "sub-ass-style-overrides", "clr", "", nullptr};
-            mpvApi().command(mpv, styleOverridesCommand);
-        }
-        if (modeChanged || sizeChanged || positionChanged) {
-            std::lock_guard<std::mutex> lock(mpvMutex);
-            if (!mpv) return;
-            if (modeChanged || sizeChanged) {
-                mpvApi().setProperty(mpv, "sub-scale", MPV_FORMAT_DOUBLE, &scale);
-                mpvApi().setProperty(mpv, "sub-font-size", MPV_FORMAT_DOUBLE, &size);
-            }
-            if (modeChanged || positionChanged) {
-                mpvApi().setProperty(mpv, "sub-pos", MPV_FORMAT_INT64, &position);
-            }
+            mpvApi().setProperty(mpv, "sub-font-size", MPV_FORMAT_DOUBLE, &size);
         }
 
         {
-            if (modeChanged || textColorChanged) {
+            if (modeChanged || assModeChanged || textColorChanged) {
                 setStringProperty("sub-color", resolvedTextColor);
             }
-            if (modeChanged || backgroundColorChanged) {
+            if (modeChanged || assModeChanged || backgroundColorChanged) {
                 setStringProperty("sub-back-color", resolvedBackgroundColor);
                 setStringProperty(
                     "sub-border-style",
                     resolvedBackgroundColor.rfind("#00", 0) == 0 ? "outline-and-shadow" : "background-box"
                 );
             }
-            if (modeChanged || outlineColorChanged) {
+            if (modeChanged || assModeChanged || outlineColorChanged) {
                 setStringProperty("sub-outline-color", resolvedOutlineColor);
             }
-            if (modeChanged || boldChanged) {
+            if (modeChanged || assModeChanged || boldChanged) {
                 setStringProperty("sub-bold", bold ? "yes" : "no");
             }
-            if (modeChanged || outlineSizeChanged) {
+            if (modeChanged || assModeChanged || outlineSizeChanged) {
                 std::lock_guard<std::mutex> lock(mpvMutex);
                 if (!mpv) return;
                 mpvApi().setProperty(mpv, "sub-outline-size", MPV_FORMAT_DOUBLE, &outline);
@@ -1548,19 +1550,71 @@ public:
             setStringProperty("sub-filter-sdh-harder", stripSdh ? "yes" : "no");
         }
 
-        hasAppliedSubtitleStyle = true;
-        appliedSubtitleUseLibass = useLibass;
         appliedSubtitleTextColor = resolvedTextColor;
         appliedSubtitleBackgroundColor = resolvedBackgroundColor;
         appliedSubtitleOutlineColor = resolvedOutlineColor;
         appliedSubtitleOutlineSize = outline;
-        appliedSubtitleBold = bold;
-        appliedSubtitleFontSize = size;
-        appliedSubtitlePosition = position;
         appliedSubtitleStripSdh = stripSdh;
     }
 
+    void syncSubtitleTrackOverride() {
+        std::lock_guard<std::mutex> styleLock(subtitleStyleMutex);
+        if (!hasAppliedSubtitleStyle) return;
+        syncSubtitleTrackOverrideLocked(false);
+    }
+
 private:
+    bool syncSubtitleTrackOverrideLocked(bool force) {
+        std::string subCodec = lowerCopy(trim(stringProperty("current-tracks/sub/codec", "")));
+        bool isAss = subCodec == "ass" || subCodec == "ssa";
+        double assScale = appliedSubtitleFontSize / 54.0;
+        std::string assOverride = !isAss
+            ? "no"
+            : (!appliedSubtitleUseLibass ? "force" : (std::abs(assScale - 1.0) <= 0.001 ? "no" : "scale"));
+        double effectiveScale = assOverride == "scale" ? assScale : 1.0;
+        int64_t effectivePosition = assOverride == "scale" ? 100 : appliedSubtitleRawPosition;
+        std::string styleOverride = assOverride == "force"
+            ? (appliedSubtitleBold ? "Bold=1" : "Bold=0")
+            : "";
+
+        bool overrideChanged = force || appliedSubtitleAssOverride != assOverride;
+        bool styleOverrideChanged = force || overrideChanged || appliedSubtitleAssStyleOverride != styleOverride;
+        bool scaleChanged = force || appliedSubtitleScale != effectiveScale;
+        bool positionChanged = force || appliedSubtitlePosition != effectivePosition;
+
+        if (overrideChanged) {
+            setStringProperty("sub-ass-override", assOverride);
+        }
+        if (styleOverrideChanged) {
+            std::lock_guard<std::mutex> lock(mpvMutex);
+            if (!mpv) return overrideChanged;
+            const char *styleOverridesCommand[] = {
+                "change-list",
+                "sub-ass-style-overrides",
+                styleOverride.empty() ? "clr" : "set",
+                styleOverride.empty() ? "" : styleOverride.c_str(),
+                nullptr
+            };
+            mpvApi().command(mpv, styleOverridesCommand);
+        }
+        if (scaleChanged || positionChanged) {
+            std::lock_guard<std::mutex> lock(mpvMutex);
+            if (!mpv) return overrideChanged;
+            if (scaleChanged) {
+                mpvApi().setProperty(mpv, "sub-scale", MPV_FORMAT_DOUBLE, &effectiveScale);
+            }
+            if (positionChanged) {
+                mpvApi().setProperty(mpv, "sub-pos", MPV_FORMAT_INT64, &effectivePosition);
+            }
+        }
+
+        appliedSubtitleTrackCodec = subCodec;
+        appliedSubtitleAssOverride = assOverride;
+        appliedSubtitleAssStyleOverride = styleOverride;
+        appliedSubtitleScale = effectiveScale;
+        appliedSubtitlePosition = effectivePosition;
+        return overrideChanged;
+    }
     HWND hostHwnd = nullptr;
     HWND containerHwnd = nullptr;
     HWND messageHwnd = nullptr;
@@ -1591,6 +1645,7 @@ private:
     std::chrono::steady_clock::time_point diagnosticLast;
     uint64_t diagnosticSession = 0;
 
+    std::mutex subtitleStyleMutex;
     bool hasAppliedSubtitleStyle = false;
     bool appliedSubtitleUseLibass = false;
     std::string appliedSubtitleTextColor;
@@ -1599,7 +1654,12 @@ private:
     double appliedSubtitleOutlineSize = 0.0;
     bool appliedSubtitleBold = false;
     double appliedSubtitleFontSize = 0.0;
+    int64_t appliedSubtitleRawPosition = 90;
     int64_t appliedSubtitlePosition = 0;
+    double appliedSubtitleScale = 1.0;
+    std::string appliedSubtitleTrackCodec;
+    std::string appliedSubtitleAssOverride;
+    std::string appliedSubtitleAssStyleOverride;
     bool appliedSubtitleStripSdh = false;
 
     JavaVM *javaVm = nullptr;
@@ -1944,6 +2004,7 @@ private:
             setMpvOptionStringLocked("input-default-bindings", "yes");
             setMpvOptionStringLocked("input-vo-keyboard", "no");
             setMpvOptionStringLocked("keep-open", "yes");
+            setMpvOptionStringLocked("sub-ass-override", "no");
             setMpvOptionStringLocked("volume-max", "200");
             setMpvOptionStringLocked("vo", "gpu-next,gpu,");
             if (rtxVideoEnabled) {
@@ -2114,6 +2175,7 @@ private:
         double volumeLevel = volume();
         bool paused = isPaused();
         bool loading = isLoading();
+        syncSubtitleTrackOverride();
         std::string audioTracks = audioTracksJson();
         std::string subtitleTracks = subtitleTracksJson();
 
@@ -2286,12 +2348,18 @@ private:
                 int status[2] = {};
                 std::memcpy(status, event->data, sizeof(status));
                 if (status[0] == 4 && status[1] < 0 && !stopping.load()) {
+                    // Kotlin is notified once, by the mpvEndFileError event below.
                     writePlaybackDiagnostic("playback-error", status[1]);
-                    sendPlayerEvent("playbackError", static_cast<double>(status[1]));
                 }
             }
             if (event->event_id == MPV_EVENT_VIDEO_RECONFIG) {
                 updateRtxVideoFilter();
+            }
+            if (event->event_id == MPV_EVENT_END_FILE) {
+                const auto *end = static_cast<const mpv_event_end_file *>(event->data);
+                if (end && end->reason == MPV_END_FILE_REASON_ERROR) {
+                    sendPlayerEvent("mpvEndFileError", end->error);
+                }
             }
         }
     }
@@ -2527,6 +2595,7 @@ private:
                  << "\"id\":\"" << jsonEscape(std::to_string(trackId)) << "\","
                  << "\"label\":\"" << jsonEscape(label) << "\","
                  << "\"language\":\"" << jsonEscape(language) << "\","
+                 << "\"codec\":\"" << jsonEscape(codec) << "\","
                  << "\"selected\":" << (selected ? "true" : "false") << ","
                  << "\"forced\":" << (forced ? "true" : "false")
                  << "}";
@@ -2555,8 +2624,8 @@ private:
             : (!trim(language).empty()
                 ? trim(language)
                 : (type == "sub" ? "Subtitle " + std::to_string(index + 1) : "Track " + std::to_string(index + 1)));
-        std::string codecName = codecDisplayName(codec);
-        if (codecName.empty()) codecName = codecDisplayName(decoderDescription);
+        std::string codecName = type == "sub" ? "" : codecDisplayName(codec);
+        if (type != "sub" && codecName.empty()) codecName = codecDisplayName(decoderDescription);
         std::string channelName = type == "audio" ? channelLayoutName(channels, channelCount) : "";
 
         std::vector<std::string> details;
@@ -3374,7 +3443,8 @@ Java_com_nuvio_app_features_player_desktop_NativePlayerBridge_setSubtitleAppeara
     jstring font,
     jstring fontsDir,
     jstring shadowColor,
-    jfloat shadowOffset
+    jfloat shadowOffset,
+    jfloat shadowBlur
 ) {
     auto player = playerFromHandle(handle);
     if (!player) return;
@@ -3382,6 +3452,7 @@ Java_com_nuvio_app_features_player_desktop_NativePlayerBridge_setSubtitleAppeara
         jstringToUtf8(env, font),
         jstringToUtf8(env, fontsDir),
         jstringToUtf8(env, shadowColor),
-        shadowOffset
+        shadowOffset,
+        shadowBlur
     );
 }

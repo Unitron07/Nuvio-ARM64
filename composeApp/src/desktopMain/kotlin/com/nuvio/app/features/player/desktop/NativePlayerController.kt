@@ -31,6 +31,7 @@ import com.nuvio.app.features.player.SubtitleOutlineColorSwatches
 import com.nuvio.app.features.player.SubtitleStyleState
 import com.nuvio.app.features.player.SubtitleTrack
 import com.nuvio.app.features.player.inferForcedSubtitleTrack
+import com.nuvio.app.features.player.subtitleFormatBadgeForCodec
 import com.nuvio.app.features.player.toStorageHexString
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.decodeFromString
@@ -41,6 +42,7 @@ import java.awt.event.WindowEvent
 import java.util.concurrent.CountDownLatch
 import javax.swing.SwingUtilities
 import kotlin.concurrent.Volatile
+import kotlin.math.roundToInt
 
 internal typealias NativePlayerCreate = (
     Long,
@@ -125,9 +127,15 @@ internal class NativePlayerController(
     private var onEvent: (String, Double) -> Boolean = { _, _ -> false }
     private var onScrubChange: (Long) -> Boolean = { false }
     private var onScrubFinished: (Long) -> Boolean = { false }
-    private val eventSink = NativePlayerEventSink { type, value ->
+    private fun eventSinkFor(source: PendingSource) = NativePlayerEventSink { type, value ->
         SwingUtilities.invokeLater {
-            handlePlayerEvent(type, value)
+            if (type == "mpvEndFileError") {
+                if (!releaseRequested && pendingSource === source) {
+                    source.onError("Playback failed (mpv error ${value.toInt()}).")
+                }
+            } else {
+                handlePlayerEvent(type, value)
+            }
         }
     }
 
@@ -324,17 +332,7 @@ internal class NativePlayerController(
                         pending.decoderPriority,
                         pending.nvidiaRtxSuperResolutionEnabled,
                         pending.nvidiaRtxHdrEnabled,
-                        NativePlayerEventSink { type, value ->
-                            if (type == "playbackError") {
-                                SwingUtilities.invokeLater {
-                                    if (!releaseRequested && pendingSource === pending) {
-                                        pending.onError("Playback failed (mpv error ${value.toInt()}).")
-                                    }
-                                }
-                            } else {
-                                eventSink.onPlayerEvent(type, value)
-                            }
-                        },
+                        eventSinkFor(pending),
                     ).also { if (it == 0L) error("Native player did not return a handle.") }
                 }.onSuccess { created ->
                     val accepted = synchronized(lifecycleLock) {
@@ -1062,7 +1060,7 @@ internal class NativePlayerController(
             SubtitleTrack(
                 index = track.index,
                 id = track.id,
-                label = track.label,
+                label = track.label.takeUnless { it.equals(track.language, ignoreCase = true) }.orEmpty(),
                 language = track.language.takeUnless(String::isBlank),
                 isSelected = track.selected,
                 isForced = track.forced || inferForcedSubtitleTrack(
@@ -1070,6 +1068,7 @@ internal class NativePlayerController(
                     language = track.language,
                     trackId = track.id,
                 ),
+                formatBadge = subtitleFormatBadgeForCodec(track.codec),
             )
         }
 
@@ -1148,11 +1147,15 @@ internal class NativePlayerController(
         }
     }
 
+    override val supportsAssStyleCustomization = true
+
+    override val rendersAssNatively = true
+
     override fun applySubtitleStyle(style: SubtitleStyleState, useLibass: Boolean) {
         pendingSubtitleStyle = style
-        pendingUseLibass = useLibass
+        pendingUseLibass = !style.appearance.customizeAss
         handle.takeIf { it != 0L }?.let { current ->
-            applySubtitleStyle(current, style, useLibass)
+            applySubtitleStyle(current, style, !style.appearance.customizeAss)
         }
     }
 
@@ -1167,25 +1170,26 @@ internal class NativePlayerController(
     }
 
     private fun applySubtitleStyle(handle: Long, style: SubtitleStyleState, useLibass: Boolean) {
+        val shadow = style.toMpvSubtitleShadow()
         NativePlayerBridge.applySubtitleStyle(
             handle = handle,
             textColor = style.textColor.toMpvColorString(),
             backgroundColor = style.backgroundColor.toMpvColorString(),
-            outlineColor = style.outlineColor.toMpvColorString(),
-            outlineSize = if (style.outlineEnabled) style.outlineWidth.toFloat() else 0f,
+            outlineColor = shadow.outlineColor,
+            outlineSize = shadow.outlineSize,
             bold = style.bold,
             fontSize = style.toMpvSubtitleFontSize(),
             subPos = style.toMpvSubtitlePosition(),
             useLibass = useLibass,
             stripSdh = style.stripSdh,
         )
-        val shadowAlpha = if (style.appearance.shadowEnabled) (style.appearance.shadowOpacity * 255 / 100) else 0
         NativePlayerBridge.setSubtitleAppearance(
             handle = handle,
             font = SubtitleFontResolver.mpvFontName(style.appearance.fontId),
             fontsDir = SubtitleFontResolver.fontsDir(),
-            shadowColor = "#" + shadowAlpha.toHexByte() + "000000",
-            shadowOffset = if (style.appearance.shadowEnabled) style.appearance.shadowSize.toFloat() else 0f,
+            shadowColor = shadow.color,
+            shadowOffset = shadow.offset,
+            shadowBlur = shadow.blur,
         )
     }
 
@@ -1222,6 +1226,7 @@ private data class NativeMpvTrack(
     val id: String = "",
     val label: String = "",
     val language: String = "",
+    val codec: String = "",
     val selected: Boolean = false,
     val forced: Boolean = false,
 )
@@ -1252,8 +1257,43 @@ private fun Color.toMpvColorString(): String {
 private fun SubtitleStyleState.toMpvSubtitlePosition(): Int =
     (100 - (bottomOffset / 2)).coerceIn(0, 150)
 
+private const val OUTLINED_SHADOW_OPACITY_SCALE = 0.47f
+
+private data class MpvSubtitleShadow(
+    val color: String,
+    val offset: Float,
+    val blur: Float,
+    val outlineColor: String,
+    val outlineSize: Float,
+)
+
+private fun SubtitleStyleState.toMpvSubtitleShadow(): MpvSubtitleShadow {
+    val outlineSize = if (outlineEnabled) outlineWidth.toFloat() else 0f
+    val outlineColor = outlineColor.toMpvColorString()
+    if (!appearance.shadowEnabled) {
+        return MpvSubtitleShadow(
+            color = "#00000000",
+            offset = 0f,
+            blur = 0f,
+            outlineColor = outlineColor,
+            outlineSize = outlineSize,
+        )
+    }
+    val softened = backgroundColor.alpha == 0f
+    val needsGlyphGuard = softened && outlineSize == 0f
+    val opacityScale = if (softened && !needsGlyphGuard) OUTLINED_SHADOW_OPACITY_SCALE else 1f
+    val shadowAlpha = (appearance.shadowOpacity * 255 / 100 * opacityScale).roundToInt().coerceIn(0, 255)
+    return MpvSubtitleShadow(
+        color = "#" + shadowAlpha.toHexByte() + "000000",
+        offset = appearance.shadowSize.toFloat(),
+        blur = if (softened) (appearance.shadowSize * 0.5f + 1f).coerceIn(1.5f, 4f) else 0f,
+        outlineColor = if (needsGlyphGuard) "#00000000" else outlineColor,
+        outlineSize = if (needsGlyphGuard) 1f else outlineSize,
+    )
+}
+
 private fun SubtitleStyleState.toMpvSubtitleFontSize(): Float =
-    (fontSizeSp * 3f).coerceIn(18f, 96f)
+    (fontSizeSp * 3f).coerceIn(18f, 120f)
 
 private fun Int.toHexByte(): String {
     val digits = "0123456789ABCDEF"
@@ -1452,6 +1492,8 @@ private fun PlayerControlsState.toControlsJson(isFullscreen: Boolean, onImageRea
         appendJsonField("subtitleAddonsTabLabel", subtitleAddonsTabLabel)
         append(',')
         appendJsonField("subtitleStyleTabLabel", subtitleStyleTabLabel)
+        append(',')
+        appendJsonField("customSubtitleStyleLabel", customSubtitleStyleLabel)
         append(',')
         appendJsonField("forcedLabel", forcedLabel)
         append(',')
@@ -1701,6 +1743,10 @@ private fun PlayerControlsState.toControlsJson(isFullscreen: Boolean, onImageRea
         appendJsonField("selectedAddonSubtitleId", selectedAddonSubtitleId)
         append(',')
         appendJsonField("useCustomSubtitles", useCustomSubtitles)
+        append(',')
+        appendJsonField("showCustomSubtitleStyleToggle", showCustomSubtitleStyleToggle)
+        append(',')
+        appendJsonField("customSubtitleStylingEnabled", customSubtitleStylingEnabled)
         append(',')
         appendJsonField("subtitleDelayMs", subtitleDelayMs)
         append(',')
@@ -1970,6 +2016,8 @@ private fun StringBuilder.appendSubtitleOptionItemJson(item: PlayerControlSubtit
     appendJsonField("title", item.title)
     append(',')
     appendJsonField("metadata", item.metadata)
+    append(',')
+    appendJsonField("formatBadge", item.formatBadge)
     append(',')
     appendJsonField("isSelected", item.isSelected)
     append(',')

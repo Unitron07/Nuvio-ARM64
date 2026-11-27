@@ -1,6 +1,8 @@
 package com.nuvio.app.features.home.components
 
 import androidx.compose.animation.animateContentSize
+import com.nuvio.app.controller.ControllerFocusZone
+import com.nuvio.app.controller.controllerFocusable
 import com.nuvio.app.core.ui.NuvioDesktopAnimation
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -161,8 +163,12 @@ fun HomeHeroSection(
     ScreenActivityEffect(autoScrollPage, items.size) { active ->
         if (!active || items.size <= 1) return@ScreenActivityEffect
         delay(HERO_AUTO_SCROLL_INTERVAL_MS)
-        while (pagerState.isScrollInProgress) {
-            delay(100L)
+        while (
+            pagerState.isScrollInProgress ||
+            listState?.isScrollInProgress == true ||
+            (listState != null && listState.firstVisibleItemIndex > 0)
+        ) {
+            delay(250L)
         }
 
         val nextPage = pagerState.currentPage + 1
@@ -203,9 +209,7 @@ fun HomeHeroSection(
             HorizontalPager(
                 state = pagerState,
                 userScrollEnabled = false,
-                modifier = Modifier
-                    .fillMaxSize()
-                    .graphicsLayer { alpha = 0.01f },
+                modifier = Modifier.fillMaxSize(),
             ) {
                 Box(modifier = Modifier.fillMaxSize())
             }
@@ -269,54 +273,56 @@ private fun HeroBackgroundLayers(
 
     val backgroundMotionStrength = if (desktopFrame) layout.backgroundMotionStrength else 1f
     layerPages.forEach { page ->
-        val item = items[page % items.size]
-        val imageUrl = item.banner ?: item.poster
-        val backgroundModifier = if (desktopFrame) {
-            Modifier
-                .fillMaxSize()
-                .heroStretchZoom { stretchPx() * backgroundMotionStrength }
-        } else {
-            Modifier
-                .fillMaxWidth()
-                .height(layout.heroHeight)
-                .heroStretchZoom(stretchPx)
-        }
-        AsyncImage(
-            model = if (desktopFrame) originalTmdbImageUrl(imageUrl) else imageUrl,
-            contentDescription = item.name,
-            desktopAnimation = NuvioDesktopAnimation.Always,
-            modifier = backgroundModifier
-                .graphicsLayer {
-                    val pageOffset = heroPageOffset(pagerState, page)
-                    val scrollOffsetPx = heroScrollOffsetPx(listState, heroHeightPx)
-                    val scrollScale = if (desktopFrame) {
-                        1f + (heroBackgroundScrollScale(scrollOffsetPx) - 1f) * backgroundMotionStrength
-                    } else {
-                        heroBackgroundScrollScale(scrollOffsetPx)
-                    }
+        key(page) {
+            val item = items[page % items.size]
+            val imageUrl = item.banner ?: item.poster
+            val backgroundModifier = if (desktopFrame) {
+                Modifier
+                    .fillMaxSize()
+                    .heroStretchZoom { stretchPx() * backgroundMotionStrength }
+            } else {
+                Modifier
+                    .fillMaxWidth()
+                    .height(layout.heroHeight)
+                    .heroStretchZoom(stretchPx)
+            }
+            AsyncImage(
+                model = if (desktopFrame) originalTmdbImageUrl(imageUrl) else imageUrl,
+                contentDescription = item.name,
+                desktopAnimation = NuvioDesktopAnimation.Always,
+                modifier = backgroundModifier
+                    .graphicsLayer {
+                        val pageOffset = heroPageOffset(pagerState, page)
+                        val scrollOffsetPx = heroScrollOffsetPx(listState, heroHeightPx)
+                        val scrollScale = if (desktopFrame) {
+                            1f + (heroBackgroundScrollScale(scrollOffsetPx) - 1f) * backgroundMotionStrength
+                        } else {
+                            heroBackgroundScrollScale(scrollOffsetPx)
+                        }
 
-                    alpha = heroPageVisibility(pageOffset)
-                    translationX = -pageOffset * heroWidthPx * HERO_BACKGROUND_PARALLAX
-                    translationY = if (desktopFrame) {
-                        heroDesktopBackgroundScrollTranslationY(scrollOffsetPx) * backgroundMotionStrength
-                    } else {
-                        heroBackgroundScrollTranslationY(scrollOffsetPx)
-                    }
-                    val baseScale = if (desktopFrame) 1f else HERO_BACKGROUND_SCALE
-                    scaleX = baseScale * scrollScale
-                    scaleY = baseScale * scrollScale
+                        alpha = heroPageVisibility(pageOffset)
+                        translationX = -pageOffset * heroWidthPx * HERO_BACKGROUND_PARALLAX
+                        translationY = if (desktopFrame) {
+                            heroDesktopBackgroundScrollTranslationY(scrollOffsetPx) * backgroundMotionStrength
+                        } else {
+                            heroBackgroundScrollTranslationY(scrollOffsetPx)
+                        }
+                        val baseScale = if (desktopFrame) 1f else HERO_BACKGROUND_SCALE
+                        scaleX = baseScale * scrollScale
+                        scaleY = baseScale * scrollScale
+                    },
+                alignment = when {
+                    desktopFrame -> BiasAlignment(
+                        horizontalBias = 0f,
+                        verticalBias = DesktopBackdropVerticalBias,
+                    )
+                    layout.isTablet -> Alignment.TopCenter
+                    else -> Alignment.Center
                 },
-            alignment = when {
-                desktopFrame -> BiasAlignment(
-                    horizontalBias = 0f,
-                    verticalBias = DesktopBackdropVerticalBias,
-                )
-                layout.isTablet -> Alignment.TopCenter
-                else -> Alignment.Center
-            },
-            contentScale = ContentScale.Crop,
-            desktopImageScaling = NuvioDesktopImageScaling.Disabled,
-        )
+                contentScale = ContentScale.Crop,
+                desktopImageScaling = NuvioDesktopImageScaling.Disabled,
+            )
+        }
     }
 }
 
@@ -411,23 +417,25 @@ private fun HeroDesktopContentLayers(
     )
 
     layerPages.forEach { page ->
-        Box(
-            modifier = Modifier
-                .fillMaxWidth()
-                .graphicsLayer {
-                    val pageOffset = heroPageOffset(pagerState, page)
+        key(page) {
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .graphicsLayer {
+                        val pageOffset = heroPageOffset(pagerState, page)
 
-                    alpha = heroPageVisibility(pageOffset)
-                    translationX = -pageOffset * heroWidthPx * HERO_CONTENT_PARALLAX
-                },
-        ) {
-            DesktopHeroContentBlock(
-                item = items[page % items.size],
-                layout = layout,
-                showImdbRating = showImdbRating,
-                showMdbListRatings = showMdbListRatings,
-                onItemClick = onItemClick,
-            )
+                        alpha = heroPageVisibility(pageOffset)
+                        translationX = -pageOffset * heroWidthPx * HERO_CONTENT_PARALLAX
+                    },
+            ) {
+                DesktopHeroContentBlock(
+                    item = items[page % items.size],
+                    layout = layout,
+                    showImdbRating = showImdbRating,
+                    showMdbListRatings = showMdbListRatings,
+                    onItemClick = onItemClick,
+                )
+            }
         }
     }
 }
@@ -528,6 +536,15 @@ private fun DefaultHomeHeroFrame(
                 Surface(
                     modifier = Modifier
                         .nuvioFocusBorder(RoundedCornerShape(40.dp))
+                        .controllerFocusable(
+                            id = "home_hero_view_details",
+                            zone = ControllerFocusZone.Content,
+                            groupKey = "home_hero",
+                            shape = RoundedCornerShape(40.dp),
+                            cornerRadius = 40.dp,
+                            selectLabel = stringResource(Res.string.home_view_details),
+                            onSelect = { onItemClick?.invoke(currentHeroItem(items, pagerState)) },
+                        )
                         .clickable(enabled = onItemClick != null) {
                             onItemClick?.invoke(currentHeroItem(items, pagerState))
                         },
@@ -574,6 +591,35 @@ private fun DesktopHomeHeroFrame(
     val opacity = NuvioTokens.Opacity
     val space = NuvioTokens.Space
     val backgroundColor = colorScheme.background
+    val topFadeBrush = remember(backgroundColor, opacity.overlayHeavy) {
+        Brush.verticalGradient(
+            colors = listOf(
+                backgroundColor.copy(alpha = opacity.overlayHeavy),
+                Color.Transparent,
+            ),
+        )
+    }
+    val sideFadeBrush = remember(backgroundColor) {
+        Brush.horizontalGradient(
+            colorStops = arrayOf(
+                0.00f to backgroundColor.copy(alpha = 0.96f),
+                0.08f to backgroundColor.copy(alpha = 0.90f),
+                0.16f to backgroundColor.copy(alpha = 0.76f),
+                0.26f to backgroundColor.copy(alpha = 0.54f),
+                0.36f to backgroundColor.copy(alpha = 0.30f),
+                0.46f to backgroundColor.copy(alpha = 0.12f),
+                0.54f to Color.Transparent,
+            ),
+        )
+    }
+    val bottomFadeBrush = remember(backgroundColor) {
+        Brush.verticalGradient(
+            colors = listOf(
+                backgroundColor.copy(alpha = 0f),
+                backgroundColor,
+            ),
+        )
+    }
 
     Box(
         modifier = Modifier
@@ -597,32 +643,13 @@ private fun DesktopHomeHeroFrame(
                 .fillMaxWidth()
                 .height(layout.topFadeHeight)
                 .align(Alignment.TopCenter)
-                .background(
-                    Brush.verticalGradient(
-                        colors = listOf(
-                            backgroundColor.copy(alpha = opacity.overlayHeavy),
-                            Color.Transparent,
-                        ),
-                    ),
-                ),
+                .background(topFadeBrush),
         )
 
         Box(
             modifier = Modifier
                 .fillMaxSize()
-                .background(
-                    Brush.horizontalGradient(
-                        colorStops = arrayOf(
-                            0.00f to backgroundColor.copy(alpha = 0.96f),
-                            0.08f to backgroundColor.copy(alpha = 0.90f),
-                            0.16f to backgroundColor.copy(alpha = 0.76f),
-                            0.26f to backgroundColor.copy(alpha = 0.54f),
-                            0.36f to backgroundColor.copy(alpha = 0.30f),
-                            0.46f to backgroundColor.copy(alpha = 0.12f),
-                            0.54f to Color.Transparent,
-                        ),
-                    ),
-                ),
+                .background(sideFadeBrush),
         )
 
         Box(
@@ -630,14 +657,7 @@ private fun DesktopHomeHeroFrame(
                 .fillMaxWidth()
                 .height(layout.bottomFadeHeight)
                 .align(Alignment.BottomCenter)
-                .background(
-                    Brush.verticalGradient(
-                        colors = listOf(
-                            backgroundColor.copy(alpha = 0f),
-                            backgroundColor,
-                        ),
-                    ),
-                ),
+                .background(bottomFadeBrush),
         )
 
         Box(
@@ -962,6 +982,15 @@ private fun DesktopHeroContentBlock(
                     modifier = Modifier
                         .height(48.dp)
                         .nuvioFocusBorder(RoundedCornerShape(40.dp))
+                        .controllerFocusable(
+                            id = "home_hero_view_details",
+                            zone = ControllerFocusZone.Content,
+                            groupKey = "home_hero",
+                            shape = RoundedCornerShape(40.dp),
+                            cornerRadius = 40.dp,
+                            selectLabel = stringResource(Res.string.home_view_details),
+                            onSelect = { onItemClick(item) },
+                        )
                         .clickable { onItemClick(item) },
                     color = colorScheme.onBackground,
                     contentColor = colorScheme.background,
