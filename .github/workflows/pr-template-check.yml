@@ -9,6 +9,12 @@ permissions:
 
 jobs:
   validate_pr_body:
+    # Nuvio-ARM64: upstream sync proposals carry the description written by
+    # scripts/automation/downstream.py, not the contributor template.
+    if: >-
+      !(github.repository == 'Unitron07/Nuvio-ARM64' &&
+        github.event.pull_request.user.login == 'github-actions[bot]' &&
+        startsWith(github.event.pull_request.head.ref, 'automation/upstream-'))
     runs-on: ubuntu-latest
     steps:
       - name: Validate required PR sections
